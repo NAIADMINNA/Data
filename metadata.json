@@ -1,0 +1,6 @@
+{
+  "name": "ระบบจัดสรรรายชื่อเจ้าหน้าที่ตามกลุ่มงาน",
+  "description": "ระบบบริหารและจัดสรรรายชื่อเจ้าหน้าที่ตามกลุ่มงาน รองรับการลากวาง (Drag & Drop) นำเข้าหลายรายชื่อ และส่งออกไฟล์ CSV",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
