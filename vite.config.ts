@@ -6,6 +6,7 @@ import {defineConfig} from 'vite';
 
 export default defineConfig(() => {
   return {
+    base: '/Data/', // <--- เพิ่มบรรทัดนี้เข้าไปครับ
     plugins: [
       react(),
       tailwindcss(),
