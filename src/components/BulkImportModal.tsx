@@ -1,13 +1,14 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Upload, X } from 'lucide-react';
 import {
-  DIVISIONS,
   formatDivisionOptionLabel,
   STAFF_TYPE_OPTIONS,
 } from '../constants/divisions';
+import { Division } from '../types';
 
 interface BulkImportModalProps {
   isOpen: boolean;
+  divisions: Division[];
   onClose: () => void;
   onImport: (
     entries: Array<{ name: string; role: string; staffType: string }>,
@@ -15,7 +16,7 @@ interface BulkImportModalProps {
   ) => void;
 }
 
-export function BulkImportModal({ isOpen, onClose, onImport }: BulkImportModalProps) {
+export function BulkImportModal({ isOpen, divisions, onClose, onImport }: BulkImportModalProps) {
   const [rawText, setRawText] = useState('');
   const [defaultStaffType, setDefaultStaffType] = useState('');
   const [divisionId, setDivisionId] = useState('unassigned');
@@ -243,7 +244,7 @@ export function BulkImportModal({ isOpen, onClose, onImport }: BulkImportModalPr
                 onChange={(e) => setDivisionId(e.target.value)}
                 className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-900 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               >
-                {DIVISIONS.map((div) => (
+                {divisions.map((div) => (
                   <option key={div.id} value={div.id}>
                     {formatDivisionOptionLabel(div)}
                   </option>

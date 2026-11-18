@@ -5,12 +5,15 @@ export interface Division {
   isPool?: boolean;
 }
 
+export type LeadershipRole = '' | 'หัวหน้ากลุ่ม' | 'หัวหน้าฝ่าย';
+
 export interface StaffMember {
   id: string;
   name: string;
   role: string;
   staffType: string;
   divisionId: string;
+  leadershipRole?: LeadershipRole;
 }
 
 export enum ViewMode {

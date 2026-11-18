@@ -1,25 +1,33 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { X } from 'lucide-react';
 import {
-  DIVISIONS,
   formatDivisionOptionLabel,
+  LEADERSHIP_ROLE_OPTIONS,
   STAFF_TYPE_OPTIONS,
 } from '../constants/divisions';
-import { StaffMember } from '../types';
+import { Division, LeadershipRole, StaffMember } from '../types';
 
 interface StaffModalProps {
   isOpen: boolean;
+  divisions: Division[];
   editingStaff: StaffMember | null;
   defaultDivisionId?: string;
   onClose: () => void;
   onSave: (
-    payload: { name: string; role: string; staffType: string; divisionId: string },
+    payload: {
+      name: string;
+      role: string;
+      staffType: string;
+      divisionId: string;
+      leadershipRole: LeadershipRole;
+    },
     editId?: string
   ) => void;
 }
 
 export function StaffModal({
   isOpen,
+  divisions,
   editingStaff,
   defaultDivisionId = 'unassigned',
   onClose,
@@ -29,6 +37,7 @@ export function StaffModal({
   const [role, setRole] = useState('');
   const [staffType, setStaffType] = useState('');
   const [divisionId, setDivisionId] = useState(defaultDivisionId);
+  const [leadershipRole, setLeadershipRole] = useState<LeadershipRole>('');
   const [error, setError] = useState('');
   const nameInputRef = useRef<HTMLInputElement>(null);
 
@@ -39,11 +48,15 @@ export function StaffModal({
         setRole(editingStaff.role);
         setStaffType(editingStaff.staffType || '');
         setDivisionId(editingStaff.divisionId);
+        setLeadershipRole(
+          editingStaff.divisionId === 'unassigned' ? '' : editingStaff.leadershipRole || ''
+        );
       } else {
         setName('');
         setRole('');
         setStaffType('');
         setDivisionId(defaultDivisionId);
+        setLeadershipRole('');
       }
       setError('');
       const timer = window.setTimeout(() => {
@@ -80,6 +93,7 @@ export function StaffModal({
         role: trimmedRole,
         staffType: trimmedStaffType,
         divisionId,
+        leadershipRole: divisionId === 'unassigned' ? '' : leadershipRole,
       },
       editingStaff?.id
     );
@@ -192,16 +206,53 @@ export function StaffModal({
             <select
               id="staff-division"
               value={divisionId}
-              onChange={(e) => setDivisionId(e.target.value)}
+              onChange={(e) => {
+                const nextDiv = e.target.value;
+                setDivisionId(nextDiv);
+                if (nextDiv === 'unassigned') {
+                  setLeadershipRole('');
+                }
+              }}
               className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-900 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             >
-              {DIVISIONS.map((div) => (
+              {divisions.map((div) => (
                 <option key={div.id} value={div.id}>
                   {formatDivisionOptionLabel(div)}
                 </option>
               ))}
             </select>
           </div>
+
+          {divisionId !== 'unassigned' && (
+            <div>
+              <span className="block text-sm font-medium text-slate-700 mb-1.5">
+                บทบาทในกลุ่มงาน / ฝ่าย
+              </span>
+              <div className="flex flex-wrap items-center gap-2">
+                {LEADERSHIP_ROLE_OPTIONS.map((opt) => {
+                  const isSelected = leadershipRole === opt.value;
+                  return (
+                    <button
+                      key={opt.label}
+                      type="button"
+                      onClick={() => setLeadershipRole(opt.value)}
+                      className={`font-heading px-3 py-1.5 rounded-xl text-xs font-medium border transition-colors whitespace-nowrap shrink-0 ${
+                        isSelected
+                          ? opt.value === 'หัวหน้าฝ่าย'
+                            ? 'bg-indigo-600 border-indigo-600 text-white'
+                            : opt.value === 'หัวหน้ากลุ่ม'
+                              ? 'bg-blue-600 border-blue-600 text-white'
+                              : 'bg-slate-800 border-slate-800 text-white'
+                          : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           <div className="pt-2 flex items-center justify-end gap-2.5">
             <button

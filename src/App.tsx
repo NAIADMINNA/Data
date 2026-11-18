@@ -8,18 +8,55 @@ import { Download, Plus, RotateCcw, Search, Trash2, Upload, X } from 'lucide-rea
 import { BoardView } from './components/BoardView';
 import { BulkImportModal } from './components/BulkImportModal';
 import { ConfirmDeleteModal } from './components/ConfirmDeleteModal';
+import { DivisionModal } from './components/DivisionModal';
 import { StaffModal } from './components/StaffModal';
 import { TableView } from './components/TableView';
 import { ToastContainer } from './components/ToastContainer';
 import {
   DIVISIONS,
+  DIVISIONS_STORAGE_KEY,
   formatDivisionOptionLabel,
   INITIAL_STAFF,
   STORAGE_KEY,
 } from './constants/divisions';
-import { StaffMember, ToastMessage, ViewMode } from './types';
+import { Division, LeadershipRole, StaffMember, ToastMessage, ViewMode } from './types';
 
-function loadInitialStaff(): StaffMember[] {
+function loadInitialDivisions(): Division[] {
+  try {
+    const raw = localStorage.getItem(DIVISIONS_STORAGE_KEY);
+    if (!raw) return DIVISIONS;
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed) && parsed.length > 0) {
+      const validRegular = parsed
+        .filter(
+          (item): item is Record<string, unknown> =>
+            Boolean(item) &&
+            typeof item === 'object' &&
+            typeof (item as Record<string, unknown>).id === 'string' &&
+            typeof (item as Record<string, unknown>).name === 'string' &&
+            (item as Record<string, unknown>).id !== 'unassigned' &&
+            !(item as Record<string, unknown>).isPool
+        )
+        .map((item, idx) => ({
+          id: item.id as string,
+          num: String(idx + 1),
+          name: (item.name as string).trim() || `กลุ่มงานที่ ${idx + 1}`,
+        }));
+      return [DIVISIONS[0], ...validRegular];
+    }
+    return DIVISIONS;
+  } catch {
+    return DIVISIONS;
+  }
+}
+
+function parseLeadershipRole(val: unknown, divisionId: string): LeadershipRole {
+  if (divisionId === 'unassigned') return '';
+  if (val === 'หัวหน้ากลุ่ม' || val === 'หัวหน้าฝ่าย') return val;
+  return '';
+}
+
+function loadInitialStaff(validDivisionIds: Set<string>): StaffMember[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return INITIAL_STAFF;
@@ -34,13 +71,18 @@ function loadInitialStaff(): StaffMember[] {
             typeof (item as Record<string, unknown>).name === 'string' &&
             typeof (item as Record<string, unknown>).divisionId === 'string'
         )
-        .map((item) => ({
-          id: item.id as string,
-          name: item.name as string,
-          role: typeof item.role === 'string' ? item.role : '',
-          staffType: typeof item.staffType === 'string' ? item.staffType : '',
-          divisionId: item.divisionId as string,
-        }));
+        .map((item) => {
+          const rawDivId = item.divisionId as string;
+          const safeDivId = validDivisionIds.has(rawDivId) ? rawDivId : 'unassigned';
+          return {
+            id: item.id as string,
+            name: item.name as string,
+            role: typeof item.role === 'string' ? item.role : '',
+            staffType: typeof item.staffType === 'string' ? item.staffType : '',
+            divisionId: safeDivId,
+            leadershipRole: parseLeadershipRole(item.leadershipRole, safeDivId),
+          };
+        });
     }
     return INITIAL_STAFF;
   } catch {
@@ -49,7 +91,11 @@ function loadInitialStaff(): StaffMember[] {
 }
 
 export default function App() {
-  const [staffList, setStaffList] = useState<StaffMember[]>(loadInitialStaff);
+  const [divisionsList, setDivisionsList] = useState<Division[]>(loadInitialDivisions);
+  const [staffList, setStaffList] = useState<StaffMember[]>(() => {
+    const initialDivs = loadInitialDivisions();
+    return loadInitialStaff(new Set(initialDivs.map((d) => d.id)));
+  });
   const [currentView, setCurrentView] = useState<ViewMode>(ViewMode.BOARD);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterDivision, setFilterDivision] = useState('ALL');
@@ -61,9 +107,19 @@ export default function App() {
   const [isBulkModalOpen, setIsBulkModalOpen] = useState(false);
   const [staffToDelete, setStaffToDelete] = useState<StaffMember | null>(null);
   const [isClearAllModalOpen, setIsClearAllModalOpen] = useState(false);
+  const [isDivisionModalOpen, setIsDivisionModalOpen] = useState(false);
+  const [editingDivision, setEditingDivision] = useState<Division | null>(null);
 
   // Toast notifications
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(DIVISIONS_STORAGE_KEY, JSON.stringify(divisionsList));
+    } catch {
+      // Ignore storage quota errors in restricted environments
+    }
+  }, [divisionsList]);
 
   useEffect(() => {
     try {
@@ -92,7 +148,8 @@ export default function App() {
         !keyword ||
         person.name.toLowerCase().includes(keyword) ||
         (person.role || '').toLowerCase().includes(keyword) ||
-        (person.staffType || '').toLowerCase().includes(keyword);
+        (person.staffType || '').toLowerCase().includes(keyword) ||
+        (person.leadershipRole || '').toLowerCase().includes(keyword);
       const matchDiv = filterDivision === 'ALL' || person.divisionId === filterDivision;
       return matchSearch && matchDiv;
     });
@@ -100,9 +157,9 @@ export default function App() {
 
   const visibleDivisions = useMemo(() => {
     return filterDivision === 'ALL'
-      ? DIVISIONS
-      : DIVISIONS.filter((d) => d.id === filterDivision);
-  }, [filterDivision]);
+      ? divisionsList
+      : divisionsList.filter((d) => d.id === filterDivision);
+  }, [divisionsList, filterDivision]);
 
   const divisionCounts = useMemo(() => {
     const counts: Record<string, number> = {};
@@ -114,6 +171,7 @@ export default function App() {
 
   const unassignedCount = divisionCounts['unassigned'] || 0;
   const assignedCount = staffList.length - unassignedCount;
+  const nextDivisionNum = String(divisionsList.filter((d) => !d.isPool).length + 1);
 
   const handleOpenAddModal = (divisionId = 'unassigned') => {
     setEditingStaff(null);
@@ -128,24 +186,96 @@ export default function App() {
   };
 
   const handleSaveStaff = (
-    payload: { name: string; role: string; staffType: string; divisionId: string },
+    payload: {
+      name: string;
+      role: string;
+      staffType: string;
+      divisionId: string;
+      leadershipRole: LeadershipRole;
+    },
     editId?: string
   ) => {
+    const cleanPayload = {
+      ...payload,
+      leadershipRole: (payload.divisionId === 'unassigned' ? '' : payload.leadershipRole) as LeadershipRole,
+    };
     if (editId) {
       setStaffList((prev) =>
-        prev.map((item) => (item.id === editId ? { ...item, ...payload } : item))
+        prev.map((item) => (item.id === editId ? { ...item, ...cleanPayload } : item))
       );
       pushToast(`บันทึกข้อมูล "${payload.name}" เรียบร้อยแล้ว`, 'success');
     } else {
       const newMember: StaffMember = {
         id: `st_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-        ...payload,
+        ...cleanPayload,
       };
       setStaffList((prev) => [...prev, newMember]);
       pushToast(`เพิ่มรายชื่อ "${payload.name}" เรียบร้อยแล้ว`, 'success');
     }
     setIsStaffModalOpen(false);
     setEditingStaff(null);
+  };
+
+  const handleOpenAddDivision = () => {
+    setEditingDivision(null);
+    setIsDivisionModalOpen(true);
+  };
+
+  const handleOpenEditDivision = (division: Division) => {
+    if (division.isPool) return;
+    setEditingDivision(division);
+    setIsDivisionModalOpen(true);
+  };
+
+  const handleSaveDivision = (name: string, editId?: string) => {
+    if (editId) {
+      setDivisionsList((prev) =>
+        prev.map((div) => (div.id === editId ? { ...div, name } : div))
+      );
+      pushToast(`แก้ไขชื่อเป็น "${name}" เรียบร้อยแล้ว`, 'success');
+    } else {
+      setDivisionsList((prev) => {
+        const regularCount = prev.filter((d) => !d.isPool).length;
+        const newDiv: Division = {
+          id: `div_${Date.now()}_${Math.random().toString(36).slice(2, 5)}`,
+          num: String(regularCount + 1),
+          name,
+        };
+        return [...prev, newDiv];
+      });
+      pushToast(`เพิ่มกลุ่มงาน "${name}" เรียบร้อยแล้ว`, 'success');
+    }
+    setIsDivisionModalOpen(false);
+    setEditingDivision(null);
+  };
+
+  const handleDeleteDivision = (divisionId: string) => {
+    const targetDiv = divisionsList.find((d) => d.id === divisionId);
+    if (!targetDiv || targetDiv.isPool) return;
+
+    setDivisionsList((prev) => {
+      const pool = prev.find((d) => d.isPool) || DIVISIONS[0];
+      const remainingRegular = prev
+        .filter((d) => !d.isPool && d.id !== divisionId)
+        .map((d, idx) => ({ ...d, num: String(idx + 1) }));
+      return [pool, ...remainingRegular];
+    });
+
+    setStaffList((prev) =>
+      prev.map((s) =>
+        s.divisionId === divisionId
+          ? { ...s, divisionId: 'unassigned', leadershipRole: '' }
+          : s
+      )
+    );
+
+    if (filterDivision === divisionId) {
+      setFilterDivision('ALL');
+    }
+
+    setIsDivisionModalOpen(false);
+    setEditingDivision(null);
+    pushToast(`ลบกลุ่มงาน "${targetDiv.name}" แล้ว`, 'danger');
   };
 
   const handleBulkImport = (
@@ -159,6 +289,7 @@ export default function App() {
       role: entry.role,
       staffType: entry.staffType,
       divisionId,
+      leadershipRole: '',
     }));
     setStaffList((prev) => [...prev, ...added]);
     setIsBulkModalOpen(false);
@@ -170,13 +301,36 @@ export default function App() {
     if (!person || person.divisionId === targetDivisionId) return;
 
     setStaffList((prev) =>
-      prev.map((s) => (s.id === staffId ? { ...s, divisionId: targetDivisionId } : s))
+      prev.map((s) =>
+        s.id === staffId
+          ? {
+              ...s,
+              divisionId: targetDivisionId,
+              leadershipRole: targetDivisionId === 'unassigned' ? '' : s.leadershipRole || '',
+            }
+          : s
+      )
     );
 
-    const targetDiv = DIVISIONS.find((d) => d.id === targetDivisionId);
+    const targetDiv = divisionsList.find((d) => d.id === targetDivisionId);
     if (targetDiv) {
       const targetLabel = targetDiv.isPool ? 'รายการรอจัดสรร' : `กลุ่มงานที่ ${targetDiv.num}`;
       pushToast(`ย้าย "${person.name}" ไปยัง ${targetLabel} แล้ว`, 'success');
+    }
+  };
+
+  const handleUpdateLeadershipRole = (staffId: string, leadershipRole: LeadershipRole) => {
+    const person = staffList.find((s) => s.id === staffId);
+    if (!person || (person.leadershipRole || '') === leadershipRole) return;
+
+    setStaffList((prev) =>
+      prev.map((s) => (s.id === staffId ? { ...s, leadershipRole } : s))
+    );
+
+    if (leadershipRole) {
+      pushToast(`ระบุให้ "${person.name}" เป็น${leadershipRole}แล้ว`, 'success');
+    } else {
+      pushToast(`ปรับบทบาทของ "${person.name}" เป็นเจ้าหน้าที่ทั่วไปแล้ว`, 'info');
     }
   };
 
@@ -196,14 +350,24 @@ export default function App() {
   };
 
   const handleExportCSV = () => {
-    const headers = ['ลำดับ', 'ชื่อ-สกุล', 'ตำแหน่ง', 'ประเภท', 'รหัสกลุ่มงาน', 'ชื่อกลุ่มงาน'];
+    const headers = [
+      'ลำดับ',
+      'ชื่อ-สกุล',
+      'ตำแหน่ง',
+      'ประเภท',
+      'บทบาทในกลุ่มงาน',
+      'รหัสกลุ่มงาน',
+      'ชื่อกลุ่มงาน',
+    ];
     const rows = staffList.map((s, i) => {
-      const div = DIVISIONS.find((d) => d.id === s.divisionId) || DIVISIONS[0];
+      const div = divisionsList.find((d) => d.id === s.divisionId) || divisionsList[0];
+      const leaderLabel = s.divisionId === 'unassigned' ? '' : s.leadershipRole || '';
       return [
         i + 1,
         `"${(s.name || '').replace(/"/g, '""')}"`,
         `"${(s.role || '').replace(/"/g, '""')}"`,
         `"${(s.staffType || '').replace(/"/g, '""')}"`,
+        `"${leaderLabel.replace(/"/g, '""')}"`,
         div.num,
         `"${div.name.replace(/"/g, '""')}"`,
       ].join(',');
@@ -336,7 +500,7 @@ export default function App() {
               className="w-full sm:w-80 px-3.5 py-2 rounded-xl border border-slate-200/90 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm text-slate-800"
             >
               <option value="ALL">แสดงทุกกลุ่มงาน ({staffList.length} คน)</option>
-              {DIVISIONS.map((d) => {
+              {divisionsList.map((d) => {
                 const count = divisionCounts[d.id] || 0;
                 return (
                   <option key={d.id} value={d.id}>
@@ -444,18 +608,24 @@ export default function App() {
         {currentView === ViewMode.BOARD ? (
           <BoardView
             divisions={visibleDivisions}
+            allDivisions={divisionsList}
             filteredStaff={filteredStaff}
             totalStaffCount={staffList.length}
             onMoveStaff={handleMoveStaff}
+            onUpdateLeadershipRole={handleUpdateLeadershipRole}
             onEditStaff={handleOpenEditModal}
             onDeleteStaff={(staff) => setStaffToDelete(staff)}
             onAddInDivision={(divId) => handleOpenAddModal(divId)}
+            onAddDivision={handleOpenAddDivision}
+            onEditDivision={handleOpenEditDivision}
           />
         ) : (
           <TableView
+            divisions={divisionsList}
             filteredStaff={filteredStaff}
             hasActiveFilter={hasActiveFilter}
             onMoveStaff={handleMoveStaff}
+            onUpdateLeadershipRole={handleUpdateLeadershipRole}
             onEditStaff={handleOpenEditModal}
             onDeleteStaff={(staff) => setStaffToDelete(staff)}
             onResetFilters={resetFilters}
@@ -467,6 +637,7 @@ export default function App() {
       {/* Modals & Toasts */}
       <StaffModal
         isOpen={isStaffModalOpen}
+        divisions={divisionsList}
         editingStaff={editingStaff}
         defaultDivisionId={defaultModalDivisionId}
         onClose={() => {
@@ -476,8 +647,22 @@ export default function App() {
         onSave={handleSaveStaff}
       />
 
+      <DivisionModal
+        isOpen={isDivisionModalOpen}
+        editingDivision={editingDivision}
+        nextDivisionNum={nextDivisionNum}
+        assignedStaffCount={editingDivision ? divisionCounts[editingDivision.id] || 0 : 0}
+        onClose={() => {
+          setIsDivisionModalOpen(false);
+          setEditingDivision(null);
+        }}
+        onSave={handleSaveDivision}
+        onDelete={handleDeleteDivision}
+      />
+
       <BulkImportModal
         isOpen={isBulkModalOpen}
+        divisions={divisionsList}
         onClose={() => setIsBulkModalOpen(false)}
         onImport={handleBulkImport}
       />

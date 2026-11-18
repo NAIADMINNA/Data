@@ -11,29 +11,37 @@ import {
   Trash2,
 } from 'lucide-react';
 import {
-  DIVISIONS,
   formatDivisionOptionLabel,
+  getLeadershipRank,
   getThaiInitial,
 } from '../constants/divisions';
-import { Division, StaffMember } from '../types';
+import { Division, LeadershipRole, StaffMember } from '../types';
 
 interface BoardViewProps {
   divisions: Division[];
+  allDivisions: Division[];
   filteredStaff: StaffMember[];
   totalStaffCount: number;
   onMoveStaff: (staffId: string, targetDivisionId: string) => void;
+  onUpdateLeadershipRole: (staffId: string, leadershipRole: LeadershipRole) => void;
   onEditStaff: (staff: StaffMember) => void;
   onDeleteStaff: (staff: StaffMember) => void;
   onAddInDivision: (divisionId: string) => void;
+  onAddDivision: () => void;
+  onEditDivision: (division: Division) => void;
 }
 
 export function BoardView({
   divisions,
+  allDivisions,
   filteredStaff,
   onMoveStaff,
+  onUpdateLeadershipRole,
   onEditStaff,
   onDeleteStaff,
   onAddInDivision,
+  onAddDivision,
+  onEditDivision,
 }: BoardViewProps) {
   const [draggedStaffId, setDraggedStaffId] = useState<string | null>(null);
   const [activeDropDivId, setActiveDropDivId] = useState<string | null>(null);
@@ -46,6 +54,7 @@ export function BoardView({
 
   const poolDivision = divisions.find((d) => d.isPool);
   const regularDivisions = divisions.filter((d) => !d.isPool);
+  const onlyPoolSelected = divisions.length === 1 && Boolean(divisions[0]?.isPool);
 
   const populatedDivCount = useMemo(
     () =>
@@ -118,7 +127,7 @@ export function BoardView({
         onChange={(e) => onMoveStaff(person.id, e.target.value)}
         className="w-full appearance-none pl-2.5 pr-6 py-1.5 rounded-lg text-xs text-slate-700 bg-slate-50/90 hover:bg-slate-100 border border-slate-200/80 hover:border-slate-300 transition-colors cursor-pointer truncate focus:outline-none focus:ring-2 focus:ring-blue-500"
       >
-        {DIVISIONS.map((d) => (
+        {allDivisions.map((d) => (
           <option key={d.id} value={d.id}>
             {formatDivisionOptionLabel(d, true)}
           </option>
@@ -130,6 +139,43 @@ export function BoardView({
       />
     </div>
   );
+
+  const renderLeadershipSelector = (person: StaffMember) => {
+    const currentLeadership = person.leadershipRole || '';
+    return (
+      <div className="relative flex items-center min-w-0">
+        <select
+          id={`leader-${person.id}`}
+          aria-label={`ระบุบทบาทในกลุ่มงานของ ${person.name}`}
+          value={currentLeadership}
+          onChange={(e) =>
+            onUpdateLeadershipRole(person.id, e.target.value as LeadershipRole)
+          }
+          className={`w-full appearance-none pl-2.5 pr-6 py-1.5 rounded-lg text-xs transition-colors cursor-pointer truncate focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+            currentLeadership === 'หัวหน้ากลุ่ม'
+              ? 'bg-blue-50 hover:bg-blue-100/70 border border-blue-300 text-blue-800 font-semibold'
+              : currentLeadership === 'หัวหน้าฝ่าย'
+                ? 'bg-indigo-50 hover:bg-indigo-100/70 border border-indigo-300 text-indigo-800 font-semibold'
+                : 'bg-slate-50/90 hover:bg-slate-100 border border-slate-200/80 hover:border-slate-300 text-slate-600'
+          }`}
+        >
+          <option value="">เจ้าหน้าที่ทั่วไป</option>
+          <option value="หัวหน้ากลุ่ม">หัวหน้ากลุ่ม</option>
+          <option value="หัวหน้าฝ่าย">หัวหน้าฝ่าย</option>
+        </select>
+        <ChevronDown
+          className={`w-3.5 h-3.5 absolute right-2 pointer-events-none ${
+            currentLeadership === 'หัวหน้ากลุ่ม'
+              ? 'text-blue-600'
+              : currentLeadership === 'หัวหน้าฝ่าย'
+                ? 'text-indigo-600'
+                : 'text-slate-400'
+          }`}
+          aria-hidden="true"
+        />
+      </div>
+    );
+  };
 
   return (
     <div className="space-y-8">
@@ -450,40 +496,49 @@ export function BoardView({
         );
       })()}
 
-      {/* 2. Active Divisions Section (8 Divisions) */}
-      {regularDivisions.length > 0 && (
+      {/* 2. Active Divisions Section */}
+      {!onlyPoolSelected && (
         <div className="space-y-4">
-          {regularDivisions.length > 1 && (
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-1">
-              <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
-                <h2 className="font-heading text-base sm:text-lg font-bold text-slate-900">
-                  กลุ่มงานในสังกัด
-                </h2>
-                <span className="text-slate-300" aria-hidden="true">
-                  ·
-                </span>
-                <span className="text-xs sm:text-sm text-slate-500 tabular-nums">
-                  มีผู้สังกัดแล้ว{' '}
-                  <strong className="font-semibold text-slate-800">{populatedDivCount}</strong> จาก{' '}
-                  {regularDivisions.length} กลุ่มงาน
-                </span>
-              </div>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-1">
+            <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
+              <h2 className="font-heading text-base sm:text-lg font-bold text-slate-900">
+                กลุ่มงานในสังกัด
+              </h2>
+              <span className="text-slate-300" aria-hidden="true">
+                ·
+              </span>
+              <span className="text-xs sm:text-sm text-slate-500 tabular-nums">
+                มีผู้สังกัดแล้ว{' '}
+                <strong className="font-semibold text-slate-800">{populatedDivCount}</strong> จาก{' '}
+                {regularDivisions.length} กลุ่มงาน
+              </span>
+            </div>
 
-              <div className="flex flex-wrap items-center gap-2.5 shrink-0">
-                {emptyDivCount > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => setHideEmptyDivisions((prev) => !prev)}
-                    className={`font-heading px-3 py-1.5 rounded-xl text-xs font-medium border transition-colors whitespace-nowrap shrink-0 ${
-                      hideEmptyDivisions
-                        ? 'bg-blue-600 border-blue-600 text-white'
-                        : 'bg-white border-slate-200/90 text-slate-600 hover:text-slate-900 hover:border-slate-300'
-                    }`}
-                  >
-                    {hideEmptyDivisions ? `แสดงกลุ่มงานว่าง (${emptyDivCount})` : 'ซ่อนกลุ่มงานว่าง'}
-                  </button>
-                )}
+            <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+              <button
+                type="button"
+                onClick={onAddDivision}
+                className="inline-flex items-center gap-1.5 font-heading px-3.5 py-1.5 rounded-xl text-xs font-medium bg-white border border-slate-200/90 text-blue-700 hover:bg-blue-50 hover:border-blue-300 transition-colors whitespace-nowrap shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>เพิ่มกลุ่มงาน</span>
+              </button>
 
+              {regularDivisions.length > 1 && emptyDivCount > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setHideEmptyDivisions((prev) => !prev)}
+                  className={`font-heading px-3 py-1.5 rounded-xl text-xs font-medium border transition-colors whitespace-nowrap shrink-0 ${
+                    hideEmptyDivisions
+                      ? 'bg-blue-600 border-blue-600 text-white'
+                      : 'bg-white border-slate-200/90 text-slate-600 hover:text-slate-900 hover:border-slate-300'
+                  }`}
+                >
+                  {hideEmptyDivisions ? `แสดงกลุ่มงานว่าง (${emptyDivCount})` : 'ซ่อนกลุ่มงานว่าง'}
+                </button>
+              )}
+
+              {regularDivisions.length > 1 && (
                 <div
                   role="group"
                   aria-label="รูปแบบการแสดงผลกลุ่มงาน"
@@ -514,11 +569,23 @@ export function BoardView({
                     <span>2 คอลัมน์</span>
                   </button>
                 </div>
-              </div>
+              )}
             </div>
-          )}
+          </div>
 
-          {displayedRegularDivisions.length === 0 ? (
+          {regularDivisions.length === 0 ? (
+            <div className="bg-white border border-slate-200/85 rounded-2xl px-6 py-10 text-center">
+              <p className="text-sm text-slate-500">ยังไม่มีกลุ่มงานในสังกัดในระบบ</p>
+              <button
+                type="button"
+                onClick={onAddDivision}
+                className="mt-3 inline-flex items-center gap-1.5 font-heading px-4 py-2 rounded-xl text-xs font-medium bg-blue-600 hover:bg-blue-700 text-white transition-colors whitespace-nowrap shrink-0"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>เพิ่มกลุ่มงานแรก</span>
+              </button>
+            </div>
+          ) : displayedRegularDivisions.length === 0 ? (
             <div className="bg-white border border-slate-200/85 rounded-2xl px-6 py-10 text-center">
               <p className="text-sm text-slate-500">
                 ยังไม่มีกลุ่มงานที่มีเจ้าหน้าที่สังกัดตามเงื่อนไขปัจจุบัน
@@ -526,7 +593,7 @@ export function BoardView({
               <button
                 type="button"
                 onClick={() => setHideEmptyDivisions(false)}
-                className="mt-3 font-heading px-4 py-2 rounded-xl text-xs font-medium bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors"
+                className="mt-3 font-heading px-4 py-2 rounded-xl text-xs font-medium bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors whitespace-nowrap shrink-0"
               >
                 แสดงครบทั้ง {regularDivisions.length} กลุ่มงาน
               </button>
@@ -540,13 +607,20 @@ export function BoardView({
               }
             >
               {displayedRegularDivisions.map((div) => {
-                const members = filteredStaff.filter((s) => s.divisionId === div.id);
+                const rawMembers = filteredStaff.filter((s) => s.divisionId === div.id);
+                const members = [...rawMembers].sort(
+                  (a, b) =>
+                    getLeadershipRank(a.leadershipRole) - getLeadershipRank(b.leadershipRole)
+                );
                 const hasMembers = members.length > 0;
                 const isDropTarget = activeDropDivId === div.id;
                 const canAcceptDrop =
                   Boolean(draggedStaffId) && draggedPerson?.divisionId !== div.id;
                 const paddedNum = div.num.padStart(2, '0');
                 const isCollapsed = Boolean(collapsedDivIds[div.id]) && !isDropTarget;
+
+                const groupHeads = members.filter((m) => m.leadershipRole === 'หัวหน้ากลุ่ม');
+                const sectionHeads = members.filter((m) => m.leadershipRole === 'หัวหน้าฝ่าย');
 
                 const typeCounts: Record<string, number> = {};
                 members.forEach((m) => {
@@ -610,6 +684,26 @@ export function BoardView({
                                 <span className="text-blue-700 font-medium">
                                   อัตรากำลัง {members.length} คน
                                 </span>
+                                {groupHeads.length > 0 && (
+                                  <>
+                                    <span className="text-slate-300" aria-hidden="true">
+                                      ·
+                                    </span>
+                                    <span className="text-blue-800 font-medium">
+                                      หัวหน้ากลุ่ม: {groupHeads.map((h) => h.name).join(', ')}
+                                    </span>
+                                  </>
+                                )}
+                                {sectionHeads.length > 0 && (
+                                  <>
+                                    <span className="text-slate-300" aria-hidden="true">
+                                      ·
+                                    </span>
+                                    <span className="text-indigo-800 font-medium">
+                                      หัวหน้าฝ่าย: {sectionHeads.map((h) => h.name).join(', ')}
+                                    </span>
+                                  </>
+                                )}
                                 {typeSummaryParts.map((part) => (
                                   <React.Fragment key={part}>
                                     <span className="text-slate-300" aria-hidden="true">
@@ -635,6 +729,16 @@ export function BoardView({
                       </div>
 
                       <div className="flex items-center gap-1.5 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => onEditDivision(div)}
+                          title={`แก้ไขชื่อ ${div.name}`}
+                          aria-label={`แก้ไขชื่อ ${div.name}`}
+                          className="inline-flex items-center gap-1 font-heading text-xs font-medium px-2.5 py-1.5 rounded-lg border border-slate-200/80 bg-white text-slate-600 hover:text-slate-900 hover:bg-slate-50 hover:border-slate-300 transition-colors whitespace-nowrap shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                        >
+                          <Pencil className="w-3.5 h-3.5 text-slate-400" />
+                          <span className="hidden sm:inline">แก้ไขชื่อ</span>
+                        </button>
                         <button
                           type="button"
                           onClick={() => onAddInDivision(div.id)}
@@ -688,13 +792,13 @@ export function BoardView({
                         <button
                           type="button"
                           onClick={() => toggleCollapseDivision(div.id)}
-                          className="font-heading font-medium text-blue-600 hover:underline"
+                          className="font-heading font-medium text-blue-600 hover:underline whitespace-nowrap shrink-0"
                         >
                           แสดงรายชื่อ
                         </button>
                       </div>
                     ) : divisionLayout === 'stack' ? (
-                      /* Full-Width Spacious Table (Aligns with Unassigned Pool Table) */
+                      /* Full-Width Spacious Table */
                       <div className="overflow-x-auto bg-white">
                         <table className="w-full text-sm text-left">
                           <thead className="bg-slate-50/50 border-b border-slate-100 text-slate-500 font-heading text-xs">
@@ -714,7 +818,10 @@ export function BoardView({
                               <th scope="col" className="px-4 py-2.5 whitespace-nowrap">
                                 ประเภท
                               </th>
-                              <th scope="col" className="px-4 py-2.5 w-72 min-w-[220px] whitespace-nowrap">
+                              <th scope="col" className="px-4 py-2.5 w-44 min-w-[155px] whitespace-nowrap">
+                                บทบาทในกลุ่มงาน
+                              </th>
+                              <th scope="col" className="px-4 py-2.5 w-64 min-w-[210px] whitespace-nowrap">
                                 ย้ายสังกัดกลุ่มงาน
                               </th>
                               <th scope="col" className="px-4 py-2.5 w-24 text-center whitespace-nowrap">
@@ -725,6 +832,7 @@ export function BoardView({
                           <tbody className="divide-y divide-slate-100">
                             {members.map((person, idx) => {
                               const isDragging = draggedStaffId === person.id;
+                              const leaderRole = person.leadershipRole || '';
                               return (
                                 <tr
                                   key={person.id}
@@ -733,6 +841,12 @@ export function BoardView({
                                   onDragEnd={handleDragEnd}
                                   className={`group hover:bg-blue-50/25 cursor-grab active:cursor-grabbing transition-colors ${
                                     isDragging ? 'opacity-35' : 'opacity-100'
+                                  } ${
+                                    leaderRole === 'หัวหน้ากลุ่ม'
+                                      ? 'bg-blue-50/20'
+                                      : leaderRole === 'หัวหน้าฝ่าย'
+                                        ? 'bg-indigo-50/20'
+                                        : ''
                                   }`}
                                 >
                                   <td className="px-4 py-2.5 text-right text-slate-400 tabular-nums whitespace-nowrap">
@@ -746,12 +860,38 @@ export function BoardView({
                                   </td>
                                   <td className="px-4 py-2.5">
                                     <div className="flex items-center gap-2.5 min-w-0">
-                                      <div className="w-7 h-7 rounded-full bg-blue-50 text-blue-700 font-heading text-xs font-semibold flex items-center justify-center shrink-0">
+                                      <div
+                                        className={`w-7 h-7 rounded-full font-heading text-xs font-semibold flex items-center justify-center shrink-0 ${
+                                          leaderRole === 'หัวหน้ากลุ่ม'
+                                            ? 'bg-blue-600 text-white'
+                                            : leaderRole === 'หัวหน้าฝ่าย'
+                                              ? 'bg-indigo-600 text-white'
+                                              : 'bg-blue-50 text-blue-700'
+                                        }`}
+                                      >
                                         {getThaiInitial(person.name)}
                                       </div>
-                                      <span className="font-medium text-slate-900">
-                                        {person.name}
-                                      </span>
+                                      <div className="flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5 min-w-0">
+                                        <span className="font-medium text-slate-900">
+                                          {person.name}
+                                        </span>
+                                        {leaderRole && (
+                                          <>
+                                            <span className="text-slate-300" aria-hidden="true">
+                                              ·
+                                            </span>
+                                            <span
+                                              className={`text-xs font-heading font-semibold whitespace-nowrap ${
+                                                leaderRole === 'หัวหน้าฝ่าย'
+                                                  ? 'text-indigo-700'
+                                                  : 'text-blue-700'
+                                              }`}
+                                            >
+                                              {leaderRole}
+                                            </span>
+                                          </>
+                                        )}
+                                      </div>
                                     </div>
                                   </td>
                                   <td className="px-4 py-2.5 text-slate-600">
@@ -760,6 +900,7 @@ export function BoardView({
                                   <td className="px-4 py-2.5 text-slate-600 whitespace-nowrap">
                                     {person.staffType || '-'}
                                   </td>
+                                  <td className="px-4 py-2">{renderLeadershipSelector(person)}</td>
                                   <td className="px-4 py-2">{renderMoveSelector(person)}</td>
                                   <td className="px-4 py-2.5 text-center whitespace-nowrap">
                                     <div className="inline-flex items-center justify-center gap-1">
@@ -796,10 +937,11 @@ export function BoardView({
                         )}
                       </div>
                     ) : (
-                      /* Symmetrical 2-Column Structured Roster Rows (No cramped 6-col squeezing) */
+                      /* Symmetrical 2-Column Structured Roster Rows */
                       <div className="divide-y divide-slate-100 flex-1 bg-white">
                         {members.map((person, idx) => {
                           const isDragging = draggedStaffId === person.id;
+                          const leaderRole = person.leadershipRole || '';
                           return (
                             <div
                               key={person.id}
@@ -808,6 +950,12 @@ export function BoardView({
                               onDragEnd={handleDragEnd}
                               className={`group px-5 py-3 hover:bg-blue-50/25 cursor-grab active:cursor-grabbing transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 ${
                                 isDragging ? 'opacity-35' : 'opacity-100'
+                              } ${
+                                leaderRole === 'หัวหน้ากลุ่ม'
+                                  ? 'bg-blue-50/20'
+                                  : leaderRole === 'หัวหน้าฝ่าย'
+                                    ? 'bg-indigo-50/20'
+                                    : ''
                               }`}
                             >
                               <div className="flex items-center gap-2.5 min-w-0 flex-1">
@@ -818,12 +966,38 @@ export function BoardView({
                                 <span className="text-xs text-slate-400 tabular-nums w-4 text-right shrink-0">
                                   {idx + 1}.
                                 </span>
-                                <div className="w-7 h-7 rounded-full bg-blue-50 text-blue-700 font-heading text-xs font-semibold flex items-center justify-center shrink-0">
+                                <div
+                                  className={`w-7 h-7 rounded-full font-heading text-xs font-semibold flex items-center justify-center shrink-0 ${
+                                    leaderRole === 'หัวหน้ากลุ่ม'
+                                      ? 'bg-blue-600 text-white'
+                                      : leaderRole === 'หัวหน้าฝ่าย'
+                                        ? 'bg-indigo-600 text-white'
+                                        : 'bg-blue-50 text-blue-700'
+                                  }`}
+                                >
                                   {getThaiInitial(person.name)}
                                 </div>
                                 <div className="min-w-0 flex-1">
-                                  <div className="font-medium text-sm text-slate-900 truncate">
-                                    {person.name}
+                                  <div className="flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5">
+                                    <span className="font-medium text-sm text-slate-900 truncate">
+                                      {person.name}
+                                    </span>
+                                    {leaderRole && (
+                                      <>
+                                        <span className="text-slate-300" aria-hidden="true">
+                                          ·
+                                        </span>
+                                        <span
+                                          className={`text-xs font-heading font-semibold whitespace-nowrap shrink-0 ${
+                                            leaderRole === 'หัวหน้าฝ่าย'
+                                              ? 'text-indigo-700'
+                                              : 'text-blue-700'
+                                          }`}
+                                        >
+                                          {leaderRole}
+                                        </span>
+                                      </>
+                                    )}
                                   </div>
                                   <div className="text-xs text-slate-500 flex flex-wrap items-center gap-x-1.5 truncate">
                                     <span className="truncate">{person.role || 'ไม่ระบุตำแหน่ง'}</span>
@@ -841,8 +1015,9 @@ export function BoardView({
                                 </div>
                               </div>
 
-                              <div className="flex items-center gap-1.5 shrink-0 pl-8 sm:pl-0">
-                                <div className="w-40">{renderMoveSelector(person)}</div>
+                              <div className="flex flex-wrap items-center gap-1.5 shrink-0 pl-8 sm:pl-0">
+                                <div className="w-36">{renderLeadershipSelector(person)}</div>
+                                <div className="w-36">{renderMoveSelector(person)}</div>
                                 <button
                                   type="button"
                                   onClick={() => onEditStaff(person)}

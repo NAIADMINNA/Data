@@ -1,6 +1,7 @@
-import { Division, StaffMember } from '../types';
+import { Division, LeadershipRole, StaffMember } from '../types';
 
 export const STORAGE_KEY = 'doe_staff_division_assignment_v1';
+export const DIVISIONS_STORAGE_KEY = 'doe_staff_divisions_v1';
 
 export const DIVISIONS: Division[] = [
   { id: 'unassigned', num: '-', name: 'รายชื่อรอจัดสรร (ยังไม่ระบุกลุ่มงาน)', isPool: true },
@@ -21,6 +22,18 @@ export const STAFF_TYPE_OPTIONS = [
   'ลูกจ้างชั่วคราว',
   'จ้างเหมาบริการ',
 ];
+
+export const LEADERSHIP_ROLE_OPTIONS: Array<{ value: LeadershipRole; label: string }> = [
+  { value: '', label: 'เจ้าหน้าที่ทั่วไป' },
+  { value: 'หัวหน้ากลุ่ม', label: 'หัวหน้ากลุ่ม' },
+  { value: 'หัวหน้าฝ่าย', label: 'หัวหน้าฝ่าย' },
+];
+
+export function getLeadershipRank(leadershipRole?: LeadershipRole): number {
+  if (leadershipRole === 'หัวหน้ากลุ่ม') return 0;
+  if (leadershipRole === 'หัวหน้าฝ่าย') return 1;
+  return 2;
+}
 
 export const INITIAL_STAFF: StaffMember[] = [
   { id: 's1', name: 'นายสมชาย สายชล', role: 'นักวิชาการแรงงานชำนาญการ', staffType: 'ข้าราชการ', divisionId: 'unassigned' },

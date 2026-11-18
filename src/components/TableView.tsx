@@ -1,11 +1,13 @@
 import { ChevronDown, Pencil, Plus, Trash2 } from 'lucide-react';
-import { DIVISIONS, formatDivisionOptionLabel } from '../constants/divisions';
-import { StaffMember } from '../types';
+import { formatDivisionOptionLabel } from '../constants/divisions';
+import { Division, LeadershipRole, StaffMember } from '../types';
 
 interface TableViewProps {
+  divisions: Division[];
   filteredStaff: StaffMember[];
   hasActiveFilter: boolean;
   onMoveStaff: (staffId: string, targetDivisionId: string) => void;
+  onUpdateLeadershipRole: (staffId: string, leadershipRole: LeadershipRole) => void;
   onEditStaff: (staff: StaffMember) => void;
   onDeleteStaff: (staff: StaffMember) => void;
   onResetFilters: () => void;
@@ -13,9 +15,11 @@ interface TableViewProps {
 }
 
 export function TableView({
+  divisions,
   filteredStaff,
   hasActiveFilter,
   onMoveStaff,
+  onUpdateLeadershipRole,
   onEditStaff,
   onDeleteStaff,
   onResetFilters,
@@ -39,6 +43,9 @@ export function TableView({
               <th scope="col" className="px-4 py-3 whitespace-nowrap">
                 ประเภท
               </th>
+              <th scope="col" className="px-4 py-3 w-44 min-w-[155px] whitespace-nowrap">
+                บทบาทในกลุ่มงาน
+              </th>
               <th scope="col" className="px-4 py-3 w-80 min-w-[240px] whitespace-nowrap">
                 สังกัดกลุ่มงาน
               </th>
@@ -50,7 +57,7 @@ export function TableView({
           <tbody className="divide-y divide-slate-100">
             {filteredStaff.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-6 py-14 text-center">
+                <td colSpan={7} className="px-6 py-14 text-center">
                   <p className="text-sm text-slate-500">
                     {hasActiveFilter
                       ? 'ไม่พบรายชื่อเจ้าหน้าที่ตามเงื่อนไขที่ค้นหา'
@@ -79,58 +86,112 @@ export function TableView({
                 </td>
               </tr>
             ) : (
-              filteredStaff.map((person, idx) => (
-                <tr key={person.id} className="hover:bg-slate-50/70 transition-colors">
-                  <td className="px-4 py-3 text-right text-slate-400 tabular-nums">{idx + 1}</td>
-                  <td className="px-4 py-3 font-medium text-slate-900">{person.name}</td>
-                  <td className="px-4 py-3 text-slate-600">{person.role || '-'}</td>
-                  <td className="px-4 py-3 text-slate-600 whitespace-nowrap">
-                    {person.staffType || '-'}
-                  </td>
-                  <td className="px-4 py-2.5">
-                    <div className="relative flex items-center">
-                      <select
-                        aria-label={`เลือกกลุ่มงานของ ${person.name}`}
-                        value={person.divisionId}
-                        onChange={(e) => onMoveStaff(person.id, e.target.value)}
-                        className="w-full appearance-none pl-3 pr-7 py-1.5 rounded-lg text-xs sm:text-sm text-slate-700 bg-slate-50/90 hover:bg-slate-100 border border-slate-200/80 hover:border-slate-300 transition-colors cursor-pointer truncate focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      >
-                        {DIVISIONS.map((d) => (
-                          <option key={d.id} value={d.id}>
-                            {formatDivisionOptionLabel(d, true)}
-                          </option>
-                        ))}
-                      </select>
-                      <ChevronDown
-                        className="w-4 h-4 text-slate-400 absolute right-2.5 pointer-events-none"
-                        aria-hidden="true"
-                      />
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 text-center whitespace-nowrap">
-                    <div className="inline-flex items-center justify-center gap-1">
-                      <button
-                        type="button"
-                        onClick={() => onEditStaff(person)}
-                        title="แก้ไขข้อมูล"
-                        aria-label={`แก้ไขข้อมูล ${person.name}`}
-                        className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
-                      >
-                        <Pencil className="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => onDeleteStaff(person)}
-                        title="ลบรายชื่อ"
-                        aria-label={`ลบรายชื่อ ${person.name}`}
-                        className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))
+              filteredStaff.map((person, idx) => {
+                const isAssigned = person.divisionId !== 'unassigned';
+                const currentLeadership = person.leadershipRole || '';
+                return (
+                  <tr key={person.id} className="hover:bg-slate-50/70 transition-colors">
+                    <td className="px-4 py-3 text-right text-slate-400 tabular-nums">{idx + 1}</td>
+                    <td className="px-4 py-3">
+                      <div className="flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5">
+                        <span className="font-medium text-slate-900">{person.name}</span>
+                        {isAssigned && currentLeadership && (
+                          <>
+                            <span className="text-slate-300" aria-hidden="true">
+                              ·
+                            </span>
+                            <span
+                              className={`text-xs font-heading font-semibold whitespace-nowrap ${
+                                currentLeadership === 'หัวหน้าฝ่าย'
+                                  ? 'text-indigo-700'
+                                  : 'text-blue-700'
+                              }`}
+                            >
+                              {currentLeadership}
+                            </span>
+                          </>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-slate-600">{person.role || '-'}</td>
+                    <td className="px-4 py-3 text-slate-600 whitespace-nowrap">
+                      {person.staffType || '-'}
+                    </td>
+                    <td className="px-4 py-2.5">
+                      {isAssigned ? (
+                        <div className="relative flex items-center">
+                          <select
+                            aria-label={`ระบุบทบาทในกลุ่มงานของ ${person.name}`}
+                            value={currentLeadership}
+                            onChange={(e) =>
+                              onUpdateLeadershipRole(person.id, e.target.value as LeadershipRole)
+                            }
+                            className={`w-full appearance-none pl-2.5 pr-7 py-1.5 rounded-lg text-xs transition-colors cursor-pointer truncate focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                              currentLeadership === 'หัวหน้ากลุ่ม'
+                                ? 'bg-blue-50 border border-blue-300 text-blue-800 font-semibold'
+                                : currentLeadership === 'หัวหน้าฝ่าย'
+                                  ? 'bg-indigo-50 border border-indigo-300 text-indigo-800 font-semibold'
+                                  : 'bg-slate-50/90 hover:bg-slate-100 border border-slate-200/80 hover:border-slate-300 text-slate-600'
+                            }`}
+                          >
+                            <option value="">เจ้าหน้าที่ทั่วไป</option>
+                            <option value="หัวหน้ากลุ่ม">หัวหน้ากลุ่ม</option>
+                            <option value="หัวหน้าฝ่าย">หัวหน้าฝ่าย</option>
+                          </select>
+                          <ChevronDown
+                            className="w-3.5 h-3.5 text-slate-400 absolute right-2 pointer-events-none"
+                            aria-hidden="true"
+                          />
+                        </div>
+                      ) : (
+                        <span className="text-xs text-slate-400 whitespace-nowrap">รอจัดสรร</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-2.5">
+                      <div className="relative flex items-center">
+                        <select
+                          aria-label={`เลือกกลุ่มงานของ ${person.name}`}
+                          value={person.divisionId}
+                          onChange={(e) => onMoveStaff(person.id, e.target.value)}
+                          className="w-full appearance-none pl-3 pr-7 py-1.5 rounded-lg text-xs sm:text-sm text-slate-700 bg-slate-50/90 hover:bg-slate-100 border border-slate-200/80 hover:border-slate-300 transition-colors cursor-pointer truncate focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        >
+                          {divisions.map((d) => (
+                            <option key={d.id} value={d.id}>
+                              {formatDivisionOptionLabel(d, true)}
+                            </option>
+                          ))}
+                        </select>
+                        <ChevronDown
+                          className="w-4 h-4 text-slate-400 absolute right-2.5 pointer-events-none"
+                          aria-hidden="true"
+                        />
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-center whitespace-nowrap">
+                      <div className="inline-flex items-center justify-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => onEditStaff(person)}
+                          title="แก้ไขข้อมูล"
+                          aria-label={`แก้ไขข้อมูล ${person.name}`}
+                          className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => onDeleteStaff(person)}
+                          title="ลบรายชื่อ"
+                          aria-label={`ลบรายชื่อ ${person.name}`}
+                          className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })
             )}
           </tbody>
         </table>
