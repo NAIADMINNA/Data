@@ -6,6 +6,7 @@ import {
   LayoutGrid,
   Pencil,
   Plus,
+  RotateCcw,
   Rows3,
   Trash2,
 } from 'lucide-react';
@@ -39,6 +40,9 @@ export function BoardView({
   const [divisionLayout, setDivisionLayout] = useState<'grid2' | 'stack'>('stack');
   const [hideEmptyDivisions, setHideEmptyDivisions] = useState(false);
   const [collapsedDivIds, setCollapsedDivIds] = useState<Record<string, boolean>>({});
+  const [poolRoleFilter, setPoolRoleFilter] = useState<string>('ALL');
+  const [poolTypeFilter, setPoolTypeFilter] = useState<string>('ALL');
+  const [isPoolExpanded, setIsPoolExpanded] = useState<boolean>(false);
 
   const poolDivision = divisions.find((d) => d.isPool);
   const regularDivisions = divisions.filter((d) => !d.isPool);
@@ -136,6 +140,70 @@ export function BoardView({
         const canAcceptDrop =
           Boolean(draggedStaffId) && draggedPerson?.divisionId !== poolDivision.id;
 
+        const matchesPoolRole = (s: StaffMember, roleFilter: string) => {
+          if (roleFilter === 'ALL') return true;
+          const val = (s.role || '').trim();
+          return roleFilter === '__EMPTY__' ? val === '' : val === roleFilter;
+        };
+
+        const matchesPoolType = (s: StaffMember, typeFilter: string) => {
+          if (typeFilter === 'ALL') return true;
+          const val = (s.staffType || '').trim();
+          return typeFilter === '__EMPTY__' ? val === '' : val === typeFilter;
+        };
+
+        // Compute available ตำแหน่ง options (respecting active ประเภท filter)
+        const rolePoolBase = poolMembers.filter((s) => matchesPoolType(s, poolTypeFilter));
+        const roleCountsMap = new Map<string, number>();
+        let emptyRoleCount = 0;
+        rolePoolBase.forEach((s) => {
+          const val = (s.role || '').trim();
+          if (!val) {
+            emptyRoleCount += 1;
+          } else {
+            roleCountsMap.set(val, (roleCountsMap.get(val) || 0) + 1);
+          }
+        });
+        if (
+          poolRoleFilter !== 'ALL' &&
+          poolRoleFilter !== '__EMPTY__' &&
+          !roleCountsMap.has(poolRoleFilter)
+        ) {
+          roleCountsMap.set(poolRoleFilter, 0);
+        }
+        const roleOptions = Array.from(roleCountsMap.entries()).sort((a, b) =>
+          a[0].localeCompare(b[0], 'th')
+        );
+
+        // Compute available ประเภท options (respecting active ตำแหน่ง filter)
+        const typePoolBase = poolMembers.filter((s) => matchesPoolRole(s, poolRoleFilter));
+        const typeCountsMap = new Map<string, number>();
+        let emptyTypeCount = 0;
+        typePoolBase.forEach((s) => {
+          const val = (s.staffType || '').trim();
+          if (!val) {
+            emptyTypeCount += 1;
+          } else {
+            typeCountsMap.set(val, (typeCountsMap.get(val) || 0) + 1);
+          }
+        });
+        if (
+          poolTypeFilter !== 'ALL' &&
+          poolTypeFilter !== '__EMPTY__' &&
+          !typeCountsMap.has(poolTypeFilter)
+        ) {
+          typeCountsMap.set(poolTypeFilter, 0);
+        }
+        const typeOptions = Array.from(typeCountsMap.entries()).sort((a, b) =>
+          a[0].localeCompare(b[0], 'th')
+        );
+
+        const displayedPoolMembers = poolMembers.filter(
+          (s) => matchesPoolRole(s, poolRoleFilter) && matchesPoolType(s, poolTypeFilter)
+        );
+
+        const hasPoolColumnFilter = poolRoleFilter !== 'ALL' || poolTypeFilter !== 'ALL';
+
         return (
           <section
             onDragOver={(e) => handleDragOver(e, poolDivision.id)}
@@ -151,7 +219,7 @@ export function BoardView({
             }`}
           >
             <div className="px-5 py-3.5 bg-amber-50/40 border-b border-slate-200/70 flex flex-wrap items-center justify-between gap-3">
-              <div className="flex items-center gap-2.5 min-w-0">
+              <div className="flex flex-wrap items-center gap-2.5 min-w-0">
                 <h2 className="font-heading font-semibold text-sm sm:text-base text-slate-900 truncate">
                   รายชื่อรอจัดสรร
                 </h2>
@@ -159,18 +227,44 @@ export function BoardView({
                   ·
                 </span>
                 <span className="text-xs sm:text-sm text-amber-800 font-medium tabular-nums whitespace-nowrap">
-                  {poolMembers.length} คน
+                  {hasPoolColumnFilter
+                    ? `แสดง ${displayedPoolMembers.length} จาก ${poolMembers.length} คน`
+                    : `${poolMembers.length} คน`}
                 </span>
+                {hasPoolColumnFilter && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPoolRoleFilter('ALL');
+                      setPoolTypeFilter('ALL');
+                    }}
+                    className="inline-flex items-center gap-1 font-heading text-xs font-medium text-blue-700 hover:text-blue-900 bg-blue-50 hover:bg-blue-100/80 px-2.5 py-1 rounded-lg transition-colors whitespace-nowrap shrink-0"
+                  >
+                    <RotateCcw className="w-3 h-3" />
+                    <span>ล้างตัวกรองหัวตาราง</span>
+                  </button>
+                )}
               </div>
 
-              <button
-                type="button"
-                onClick={() => onAddInDivision(poolDivision.id)}
-                className="inline-flex items-center gap-1 font-heading text-xs font-medium text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-50 border border-slate-200/90 px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
-              >
-                <Plus className="w-3.5 h-3.5 text-amber-600" />
-                <span>เพิ่มรายชื่อ</span>
-              </button>
+              <div className="flex items-center gap-2 shrink-0">
+                {poolMembers.length > 6 && (
+                  <button
+                    type="button"
+                    onClick={() => setIsPoolExpanded((prev) => !prev)}
+                    className="font-heading text-xs font-medium text-slate-600 hover:text-slate-900 bg-white/80 hover:bg-white border border-slate-200/80 px-2.5 py-1.5 rounded-lg transition-colors whitespace-nowrap shrink-0"
+                  >
+                    {isPoolExpanded ? 'จำกัดความสูงตาราง' : 'ขยายตารางทั้งหมด'}
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => onAddInDivision(poolDivision.id)}
+                  className="inline-flex items-center gap-1 font-heading text-xs font-medium text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-50 border border-slate-200/90 px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                >
+                  <Plus className="w-3.5 h-3.5 text-amber-600" />
+                  <span>เพิ่มรายชื่อ</span>
+                </button>
+              </div>
             </div>
 
             {poolMembers.length === 0 ? (
@@ -182,9 +276,13 @@ export function BoardView({
                 </span>
               </div>
             ) : (
-              <div className="overflow-x-auto">
+              <div
+                className={`overflow-x-auto ${
+                  isPoolExpanded ? '' : 'max-h-[320px] overflow-y-auto'
+                }`}
+              >
                 <table className="w-full text-sm text-left">
-                  <thead className="bg-slate-50/50 border-b border-slate-100 text-slate-500 font-heading text-xs">
+                  <thead className="sticky top-0 z-10 bg-slate-50 border-b border-slate-200/80 text-slate-600 font-heading text-xs">
                     <tr>
                       <th scope="col" className="px-4 py-2.5 w-14 text-right tabular-nums whitespace-nowrap">
                         ลำดับ
@@ -192,11 +290,71 @@ export function BoardView({
                       <th scope="col" className="px-4 py-2.5 whitespace-nowrap">
                         ชื่อ-สกุล
                       </th>
-                      <th scope="col" className="px-4 py-2.5 whitespace-nowrap">
-                        ตำแหน่ง
+                      <th scope="col" className="px-3 py-2 min-w-[200px] whitespace-nowrap">
+                        <div className="flex items-center gap-2">
+                          <span className="shrink-0 text-slate-700">ตำแหน่ง</span>
+                          <div className="relative min-w-0 flex-1 max-w-[200px]">
+                            <select
+                              aria-label="เลือกกรองตามตำแหน่ง"
+                              value={poolRoleFilter}
+                              onChange={(e) => setPoolRoleFilter(e.target.value)}
+                              className={`w-full appearance-none pl-2.5 pr-6 py-1 rounded-lg text-xs font-normal transition-colors cursor-pointer truncate focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                                poolRoleFilter !== 'ALL'
+                                  ? 'bg-blue-50 border border-blue-400 text-blue-800 font-medium'
+                                  : 'bg-white border border-slate-200/90 text-slate-700 hover:border-slate-300'
+                              }`}
+                            >
+                              <option value="ALL">ทั้งหมด ({rolePoolBase.length})</option>
+                              {roleOptions.map(([roleName, count]) => (
+                                <option key={roleName} value={roleName}>
+                                  {roleName} ({count})
+                                </option>
+                              ))}
+                              {(emptyRoleCount > 0 || poolRoleFilter === '__EMPTY__') && (
+                                <option value="__EMPTY__">
+                                  ไม่ระบุตำแหน่ง ({emptyRoleCount})
+                                </option>
+                              )}
+                            </select>
+                            <ChevronDown
+                              className="w-3.5 h-3.5 text-slate-400 absolute right-1.5 top-1/2 -translate-y-1/2 pointer-events-none"
+                              aria-hidden="true"
+                            />
+                          </div>
+                        </div>
                       </th>
-                      <th scope="col" className="px-4 py-2.5 whitespace-nowrap">
-                        ประเภท
+                      <th scope="col" className="px-3 py-2 min-w-[170px] whitespace-nowrap">
+                        <div className="flex items-center gap-2">
+                          <span className="shrink-0 text-slate-700">ประเภท</span>
+                          <div className="relative min-w-0 flex-1 max-w-[165px]">
+                            <select
+                              aria-label="เลือกกรองตามประเภท"
+                              value={poolTypeFilter}
+                              onChange={(e) => setPoolTypeFilter(e.target.value)}
+                              className={`w-full appearance-none pl-2.5 pr-6 py-1 rounded-lg text-xs font-normal transition-colors cursor-pointer truncate focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                                poolTypeFilter !== 'ALL'
+                                  ? 'bg-blue-50 border border-blue-400 text-blue-800 font-medium'
+                                  : 'bg-white border border-slate-200/90 text-slate-700 hover:border-slate-300'
+                              }`}
+                            >
+                              <option value="ALL">ทั้งหมด ({typePoolBase.length})</option>
+                              {typeOptions.map(([typeName, count]) => (
+                                <option key={typeName} value={typeName}>
+                                  {typeName} ({count})
+                                </option>
+                              ))}
+                              {(emptyTypeCount > 0 || poolTypeFilter === '__EMPTY__') && (
+                                <option value="__EMPTY__">
+                                  ไม่ระบุประเภท ({emptyTypeCount})
+                                </option>
+                              )}
+                            </select>
+                            <ChevronDown
+                              className="w-3.5 h-3.5 text-slate-400 absolute right-1.5 top-1/2 -translate-y-1/2 pointer-events-none"
+                              aria-hidden="true"
+                            />
+                          </div>
+                        </div>
                       </th>
                       <th scope="col" className="px-4 py-2.5 w-72 min-w-[220px] whitespace-nowrap">
                         เลือกจัดสรรกลุ่มงาน
@@ -207,65 +365,83 @@ export function BoardView({
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {poolMembers.map((person, idx) => {
-                      const isDragging = draggedStaffId === person.id;
-                      return (
-                        <tr
-                          key={person.id}
-                          draggable
-                          onDragStart={(e) => handleDragStart(e, person.id)}
-                          onDragEnd={handleDragEnd}
-                          className={`group hover:bg-amber-50/25 cursor-grab active:cursor-grabbing transition-colors ${
-                            isDragging ? 'opacity-35' : 'opacity-100'
-                          }`}
-                        >
-                          <td className="px-4 py-2.5 text-right text-slate-400 tabular-nums whitespace-nowrap">
-                            <div className="inline-flex items-center justify-end gap-1.5">
-                              <GripVertical
-                                className="w-3.5 h-3.5 text-slate-300 group-hover:text-amber-500 shrink-0 transition-colors"
-                                aria-hidden="true"
-                              />
-                              <span>{idx + 1}</span>
-                            </div>
-                          </td>
-                          <td className="px-4 py-2.5">
-                            <div className="flex items-center gap-2.5 min-w-0">
-                              <div className="w-7 h-7 rounded-full bg-amber-100/70 text-amber-900 font-heading text-xs font-semibold flex items-center justify-center shrink-0">
-                                {getThaiInitial(person.name)}
+                    {displayedPoolMembers.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="px-4 py-8 text-center text-xs text-slate-500">
+                          <span>ไม่พบรายชื่อรอจัดสรรที่ตรงกับตำแหน่งหรือประเภทที่เลือก</span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setPoolRoleFilter('ALL');
+                              setPoolTypeFilter('ALL');
+                            }}
+                            className="ml-2 font-heading font-medium text-blue-600 hover:underline"
+                          >
+                            แสดงทั้งหมด ({poolMembers.length} คน)
+                          </button>
+                        </td>
+                      </tr>
+                    ) : (
+                      displayedPoolMembers.map((person, idx) => {
+                        const isDragging = draggedStaffId === person.id;
+                        return (
+                          <tr
+                            key={person.id}
+                            draggable
+                            onDragStart={(e) => handleDragStart(e, person.id)}
+                            onDragEnd={handleDragEnd}
+                            className={`group hover:bg-amber-50/25 cursor-grab active:cursor-grabbing transition-colors ${
+                              isDragging ? 'opacity-35' : 'opacity-100'
+                            }`}
+                          >
+                            <td className="px-4 py-2.5 text-right text-slate-400 tabular-nums whitespace-nowrap">
+                              <div className="inline-flex items-center justify-end gap-1.5">
+                                <GripVertical
+                                  className="w-3.5 h-3.5 text-slate-300 group-hover:text-amber-500 shrink-0 transition-colors"
+                                  aria-hidden="true"
+                                />
+                                <span>{idx + 1}</span>
                               </div>
-                              <span className="font-medium text-slate-900">{person.name}</span>
-                            </div>
-                          </td>
-                          <td className="px-4 py-2.5 text-slate-600">{person.role || '-'}</td>
-                          <td className="px-4 py-2.5 text-slate-600 whitespace-nowrap">
-                            {person.staffType || '-'}
-                          </td>
-                          <td className="px-4 py-2">{renderMoveSelector(person)}</td>
-                          <td className="px-4 py-2.5 text-center whitespace-nowrap">
-                            <div className="inline-flex items-center justify-center gap-1">
-                              <button
-                                type="button"
-                                onClick={() => onEditStaff(person)}
-                                title="แก้ไขข้อมูล"
-                                aria-label={`แก้ไขข้อมูล ${person.name}`}
-                                className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
-                              >
-                                <Pencil className="w-3.5 h-3.5" />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => onDeleteStaff(person)}
-                                title="ลบรายชื่อ"
-                                aria-label={`ลบรายชื่อ ${person.name}`}
-                                className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
+                            </td>
+                            <td className="px-4 py-2.5">
+                              <div className="flex items-center gap-2.5 min-w-0">
+                                <div className="w-7 h-7 rounded-full bg-amber-100/70 text-amber-900 font-heading text-xs font-semibold flex items-center justify-center shrink-0">
+                                  {getThaiInitial(person.name)}
+                                </div>
+                                <span className="font-medium text-slate-900">{person.name}</span>
+                              </div>
+                            </td>
+                            <td className="px-3 py-2.5 text-slate-600">{person.role || '-'}</td>
+                            <td className="px-3 py-2.5 text-slate-600 whitespace-nowrap">
+                              {person.staffType || '-'}
+                            </td>
+                            <td className="px-4 py-2">{renderMoveSelector(person)}</td>
+                            <td className="px-4 py-2.5 text-center whitespace-nowrap">
+                              <div className="inline-flex items-center justify-center gap-1">
+                                <button
+                                  type="button"
+                                  onClick={() => onEditStaff(person)}
+                                  title="แก้ไขข้อมูล"
+                                  aria-label={`แก้ไขข้อมูล ${person.name}`}
+                                  className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                                >
+                                  <Pencil className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => onDeleteStaff(person)}
+                                  title="ลบรายชื่อ"
+                                  aria-label={`ลบรายชื่อ ${person.name}`}
+                                  className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
                   </tbody>
                 </table>
               </div>
