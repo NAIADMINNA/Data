@@ -1,5 +1,5 @@
-import { ChevronDown, Pencil, Plus, Trash2 } from 'lucide-react';
-import { formatDivisionOptionLabel } from '../constants/divisions';
+import { ChevronDown, MapPin, Pencil, Plus, Trash2 } from 'lucide-react';
+import { formatDivisionOptionLabel, getThaiInitial } from '../constants/divisions';
 import { Division, LeadershipRole, StaffMember } from '../types';
 
 interface TableViewProps {
@@ -8,6 +8,7 @@ interface TableViewProps {
   hasActiveFilter: boolean;
   onMoveStaff: (staffId: string, targetDivisionId: string) => void;
   onUpdateLeadershipRole: (staffId: string, leadershipRole: LeadershipRole) => void;
+  onEditWorkLocation: (staff: StaffMember) => void;
   onEditStaff: (staff: StaffMember) => void;
   onDeleteStaff: (staff: StaffMember) => void;
   onResetFilters: () => void;
@@ -20,16 +21,17 @@ export function TableView({
   hasActiveFilter,
   onMoveStaff,
   onUpdateLeadershipRole,
+  onEditWorkLocation,
   onEditStaff,
   onDeleteStaff,
   onResetFilters,
   onAddStaff,
 }: TableViewProps) {
   return (
-    <div className="bg-white border border-slate-200/85 rounded-2xl overflow-hidden">
-      <div className="overflow-x-auto">
+    <div className="bg-white border border-slate-200/85 rounded-2xl shadow-[0_1px_2px_rgba(15,23,42,0.03),0_8px_24px_-14px_rgba(15,23,42,0.08)] overflow-hidden">
+      <div className="overflow-x-auto subtle-scrollbar">
         <table className="w-full text-sm text-left">
-          <thead className="bg-slate-50/60 border-b border-slate-100 text-slate-500 font-heading text-xs">
+          <thead className="bg-slate-50/90 border-b border-slate-200/80 text-slate-600 font-heading text-xs">
             <tr>
               <th scope="col" className="px-4 py-3 w-14 text-right tabular-nums whitespace-nowrap">
                 ลำดับ
@@ -49,7 +51,7 @@ export function TableView({
               <th scope="col" className="px-4 py-3 w-80 min-w-[240px] whitespace-nowrap">
                 สังกัดกลุ่มงาน
               </th>
-              <th scope="col" className="px-4 py-3 w-24 text-center whitespace-nowrap">
+              <th scope="col" className="px-4 py-3 w-28 text-center whitespace-nowrap">
                 จัดการ
               </th>
             </tr>
@@ -89,28 +91,66 @@ export function TableView({
               filteredStaff.map((person, idx) => {
                 const isAssigned = person.divisionId !== 'unassigned';
                 const currentLeadership = person.leadershipRole || '';
+                const offsiteLocation = isAssigned ? (person.workLocation || '').trim() : '';
                 return (
-                  <tr key={person.id} className="hover:bg-slate-50/70 transition-colors">
+                  <tr
+                    key={person.id}
+                    className={`hover:bg-blue-50/25 transition-colors ${
+                      isAssigned && currentLeadership === 'หัวหน้ากลุ่ม'
+                        ? 'bg-blue-50/15'
+                        : isAssigned && currentLeadership === 'หัวหน้าฝ่าย'
+                          ? 'bg-indigo-50/15'
+                          : ''
+                    }`}
+                  >
                     <td className="px-4 py-3 text-right text-slate-400 tabular-nums">{idx + 1}</td>
                     <td className="px-4 py-3">
-                      <div className="flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5">
-                        <span className="font-medium text-slate-900">{person.name}</span>
-                        {isAssigned && currentLeadership && (
-                          <>
-                            <span className="text-slate-300" aria-hidden="true">
-                              ·
-                            </span>
-                            <span
-                              className={`text-xs font-heading font-semibold whitespace-nowrap ${
-                                currentLeadership === 'หัวหน้าฝ่าย'
-                                  ? 'text-indigo-700'
-                                  : 'text-blue-700'
-                              }`}
+                      <div className="flex items-start gap-2.5 min-w-0">
+                        <div
+                          className={`w-7 h-7 mt-0.5 rounded-full font-heading text-xs font-semibold flex items-center justify-center shrink-0 ${
+                            !isAssigned
+                              ? 'bg-amber-100/80 text-amber-900'
+                              : currentLeadership === 'หัวหน้ากลุ่ม'
+                                ? 'bg-blue-600 text-white'
+                                : currentLeadership === 'หัวหน้าฝ่าย'
+                                  ? 'bg-indigo-600 text-white'
+                                  : 'bg-blue-50 text-blue-700'
+                          }`}
+                        >
+                          {getThaiInitial(person.name)}
+                        </div>
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5">
+                            <span className="font-medium text-slate-900">{person.name}</span>
+                            {isAssigned && currentLeadership && (
+                              <>
+                                <span className="text-slate-300" aria-hidden="true">
+                                  ·
+                                </span>
+                                <span
+                                  className={`text-xs font-heading font-semibold whitespace-nowrap ${
+                                    currentLeadership === 'หัวหน้าฝ่าย'
+                                      ? 'text-indigo-700'
+                                      : 'text-blue-700'
+                                  }`}
+                                >
+                                  {currentLeadership}
+                                </span>
+                              </>
+                            )}
+                          </div>
+                          {offsiteLocation && (
+                            <button
+                              type="button"
+                              onClick={() => onEditWorkLocation(person)}
+                              title="คลิกเพื่อแก้ไขหรือยกเลิกสถานที่ปฏิบัติงานจริง"
+                              className="mt-0.5 inline-flex items-center gap-1 text-xs text-amber-700 hover:text-amber-900 hover:underline text-left"
                             >
-                              {currentLeadership}
-                            </span>
-                          </>
-                        )}
+                              <MapPin className="w-3 h-3 shrink-0 text-amber-600" aria-hidden="true" />
+                              <span>ปฏิบัติงานที่: {offsiteLocation}</span>
+                            </button>
+                          )}
+                        </div>
                       </div>
                     </td>
                     <td className="px-4 py-3 text-slate-600">{person.role || '-'}</td>
@@ -169,6 +209,25 @@ export function TableView({
                     </td>
                     <td className="px-4 py-3 text-center whitespace-nowrap">
                       <div className="inline-flex items-center justify-center gap-1">
+                        {isAssigned && (
+                          <button
+                            type="button"
+                            onClick={() => onEditWorkLocation(person)}
+                            title={
+                              offsiteLocation
+                                ? `ปฏิบัติงานที่: ${offsiteLocation} (คลิกเพื่อแก้ไข)`
+                                : 'ระบุกรณีปฏิบัติงานที่อื่น'
+                            }
+                            aria-label={`ระบุสถานที่ปฏิบัติงานจริงของ ${person.name}`}
+                            className={`p-1.5 rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 ${
+                              offsiteLocation
+                                ? 'text-amber-600 bg-amber-50 hover:bg-amber-100'
+                                : 'text-slate-400 hover:text-amber-600 hover:bg-amber-50'
+                            }`}
+                          >
+                            <MapPin className="w-3.5 h-3.5" />
+                          </button>
+                        )}
                         <button
                           type="button"
                           onClick={() => onEditStaff(person)}

@@ -29,6 +29,11 @@ export const LEADERSHIP_ROLE_OPTIONS: Array<{ value: LeadershipRole; label: stri
   { value: 'หัวหน้าฝ่าย', label: 'หัวหน้าฝ่าย' },
 ];
 
+export const WORK_LOCATION_SUGGESTIONS = [
+  'ช่วยปฏิบัติงานกลุ่มงานอื่น',
+  'ปฏิบัติงานสำนักงานส่วนกลาง',
+];
+
 export function getLeadershipRank(leadershipRole?: LeadershipRole): number {
   if (leadershipRole === 'หัวหน้ากลุ่ม') return 0;
   if (leadershipRole === 'หัวหน้าฝ่าย') return 1;

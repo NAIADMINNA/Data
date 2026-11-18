@@ -12,6 +12,7 @@ import { DivisionModal } from './components/DivisionModal';
 import { StaffModal } from './components/StaffModal';
 import { TableView } from './components/TableView';
 import { ToastContainer } from './components/ToastContainer';
+import { WorkLocationModal } from './components/WorkLocationModal';
 import {
   DIVISIONS,
   DIVISIONS_STORAGE_KEY,
@@ -81,6 +82,10 @@ function loadInitialStaff(validDivisionIds: Set<string>): StaffMember[] {
             staffType: typeof item.staffType === 'string' ? item.staffType : '',
             divisionId: safeDivId,
             leadershipRole: parseLeadershipRole(item.leadershipRole, safeDivId),
+            workLocation:
+              safeDivId !== 'unassigned' && typeof item.workLocation === 'string'
+                ? item.workLocation.trim()
+                : '',
           };
         });
     }
@@ -109,6 +114,7 @@ export default function App() {
   const [isClearAllModalOpen, setIsClearAllModalOpen] = useState(false);
   const [isDivisionModalOpen, setIsDivisionModalOpen] = useState(false);
   const [editingDivision, setEditingDivision] = useState<Division | null>(null);
+  const [workLocationStaff, setWorkLocationStaff] = useState<StaffMember | null>(null);
 
   // Toast notifications
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
@@ -144,12 +150,15 @@ export default function App() {
   const filteredStaff = useMemo(() => {
     const keyword = searchQuery.trim().toLowerCase();
     return staffList.filter((person) => {
+      const workLoc = (person.workLocation || '').trim();
       const matchSearch =
         !keyword ||
         person.name.toLowerCase().includes(keyword) ||
         (person.role || '').toLowerCase().includes(keyword) ||
         (person.staffType || '').toLowerCase().includes(keyword) ||
-        (person.leadershipRole || '').toLowerCase().includes(keyword);
+        (person.leadershipRole || '').toLowerCase().includes(keyword) ||
+        workLoc.toLowerCase().includes(keyword) ||
+        (Boolean(workLoc) && 'ปฏิบัติงานที่อื่น'.includes(keyword));
       const matchDiv = filterDivision === 'ALL' || person.divisionId === filterDivision;
       return matchSearch && matchDiv;
     });
@@ -169,9 +178,31 @@ export default function App() {
     return counts;
   }, [staffList]);
 
+  const recentWorkLocations = useMemo(() => {
+    const set = new Set<string>();
+    staffList.forEach((s) => {
+      const loc = (s.workLocation || '').trim();
+      if (loc) set.add(loc);
+    });
+    return Array.from(set);
+  }, [staffList]);
+
   const unassignedCount = divisionCounts['unassigned'] || 0;
   const assignedCount = staffList.length - unassignedCount;
-  const nextDivisionNum = String(divisionsList.filter((d) => !d.isPool).length + 1);
+  const regularDivisionCount = useMemo(
+    () => divisionsList.filter((d) => !d.isPool).length,
+    [divisionsList]
+  );
+  const assignmentPercent =
+    staffList.length > 0 ? Math.round((assignedCount / staffList.length) * 100) : 0;
+  const offsiteCount = useMemo(
+    () =>
+      staffList.filter(
+        (s) => s.divisionId !== 'unassigned' && Boolean((s.workLocation || '').trim())
+      ).length,
+    [staffList]
+  );
+  const nextDivisionNum = String(regularDivisionCount + 1);
 
   const handleOpenAddModal = (divisionId = 'unassigned') => {
     setEditingStaff(null);
@@ -192,12 +223,14 @@ export default function App() {
       staffType: string;
       divisionId: string;
       leadershipRole: LeadershipRole;
+      workLocation: string;
     },
     editId?: string
   ) => {
     const cleanPayload = {
       ...payload,
       leadershipRole: (payload.divisionId === 'unassigned' ? '' : payload.leadershipRole) as LeadershipRole,
+      workLocation: payload.divisionId === 'unassigned' ? '' : payload.workLocation.trim(),
     };
     if (editId) {
       setStaffList((prev) =>
@@ -264,7 +297,7 @@ export default function App() {
     setStaffList((prev) =>
       prev.map((s) =>
         s.divisionId === divisionId
-          ? { ...s, divisionId: 'unassigned', leadershipRole: '' }
+          ? { ...s, divisionId: 'unassigned', leadershipRole: '', workLocation: '' }
           : s
       )
     );
@@ -290,6 +323,7 @@ export default function App() {
       staffType: entry.staffType,
       divisionId,
       leadershipRole: '',
+      workLocation: '',
     }));
     setStaffList((prev) => [...prev, ...added]);
     setIsBulkModalOpen(false);
@@ -307,6 +341,7 @@ export default function App() {
               ...s,
               divisionId: targetDivisionId,
               leadershipRole: targetDivisionId === 'unassigned' ? '' : s.leadershipRole || '',
+              workLocation: targetDivisionId === 'unassigned' ? '' : s.workLocation || '',
             }
           : s
       )
@@ -334,6 +369,22 @@ export default function App() {
     }
   };
 
+  const handleSaveWorkLocation = (staffId: string, workLocation: string) => {
+    const person = staffList.find((s) => s.id === staffId);
+    const cleaned = workLocation.trim();
+    setStaffList((prev) =>
+      prev.map((s) => (s.id === staffId ? { ...s, workLocation: cleaned } : s))
+    );
+    setWorkLocationStaff(null);
+    if (person) {
+      if (cleaned) {
+        pushToast(`บันทึกสถานที่ปฏิบัติงานจริงของ "${person.name}" แล้ว`, 'success');
+      } else {
+        pushToast(`ปรับสถานะ "${person.name}" เป็นปฏิบัติงานตามสังกัดแล้ว`, 'info');
+      }
+    }
+  };
+
   const handleConfirmDelete = (staffId: string) => {
     const target = staffList.find((s) => s.id === staffId);
     setStaffList((prev) => prev.filter((s) => s.id !== staffId));
@@ -358,10 +409,15 @@ export default function App() {
       'บทบาทในกลุ่มงาน',
       'รหัสกลุ่มงาน',
       'ชื่อกลุ่มงาน',
+      'สถานที่ปฏิบัติงานจริง',
     ];
     const rows = staffList.map((s, i) => {
       const div = divisionsList.find((d) => d.id === s.divisionId) || divisionsList[0];
       const leaderLabel = s.divisionId === 'unassigned' ? '' : s.leadershipRole || '';
+      const workLocLabel =
+        s.divisionId === 'unassigned'
+          ? ''
+          : (s.workLocation || '').trim() || 'ปฏิบัติงานตามสังกัด';
       return [
         i + 1,
         `"${(s.name || '').replace(/"/g, '""')}"`,
@@ -370,6 +426,7 @@ export default function App() {
         `"${leaderLabel.replace(/"/g, '""')}"`,
         div.num,
         `"${div.name.replace(/"/g, '""')}"`,
+        `"${workLocLabel.replace(/"/g, '""')}"`,
       ].join(',');
     });
     const csvContent = '\uFEFF' + [headers.join(','), ...rows].join('\n');
@@ -393,9 +450,9 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#f8fafc] text-slate-900">
+    <div className="min-h-screen flex flex-col bg-[#f4f6fa] bg-[radial-gradient(ellipse_at_top,_rgba(29,78,216,0.055),_transparent_52%)] text-slate-900">
       {/* Top Bar (Strict 3-Zone Contract) */}
-      <header className="bg-white border-b border-slate-200/80">
+      <header className="sticky top-0 z-30 bg-white/92 backdrop-blur-md border-b border-slate-200/80 shadow-[0_1px_2px_rgba(15,23,42,0.03)]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-8">
           <a
             href="#top"
@@ -404,20 +461,22 @@ export default function App() {
               resetFilters();
               setCurrentView(ViewMode.BOARD);
             }}
-            className="font-heading text-base sm:text-lg font-bold tracking-tight text-slate-900 whitespace-nowrap shrink-0 truncate"
+            className="font-heading text-base sm:text-[17px] font-bold tracking-tight text-slate-900 hover:text-blue-800 transition-colors whitespace-nowrap shrink-0 truncate"
           >
             ระบบจัดสรรรายชื่อเจ้าหน้าที่ตามกลุ่มงาน
           </a>
 
           <nav
             aria-label="เมนูหลัก"
-            className="hidden md:flex items-center gap-6 text-sm font-medium text-slate-600"
+            className="hidden md:flex items-center gap-6 text-sm font-medium text-slate-600 h-full"
           >
             <button
               type="button"
               onClick={() => setCurrentView(ViewMode.BOARD)}
-              className={`hover:text-slate-900 hover:underline underline-offset-4 transition-colors whitespace-nowrap shrink-0 ${
-                currentView === ViewMode.BOARD ? 'text-blue-600 font-semibold' : ''
+              className={`h-full inline-flex items-center border-b-2 transition-colors whitespace-nowrap shrink-0 ${
+                currentView === ViewMode.BOARD
+                  ? 'border-blue-700 text-blue-700 font-semibold'
+                  : 'border-transparent hover:text-slate-900 hover:border-slate-300'
               }`}
             >
               บอร์ดจัดสรร
@@ -425,8 +484,10 @@ export default function App() {
             <button
               type="button"
               onClick={() => setCurrentView(ViewMode.TABLE)}
-              className={`hover:text-slate-900 hover:underline underline-offset-4 transition-colors whitespace-nowrap shrink-0 ${
-                currentView === ViewMode.TABLE ? 'text-blue-600 font-semibold' : ''
+              className={`h-full inline-flex items-center border-b-2 transition-colors whitespace-nowrap shrink-0 ${
+                currentView === ViewMode.TABLE
+                  ? 'border-blue-700 text-blue-700 font-semibold'
+                  : 'border-transparent hover:text-slate-900 hover:border-slate-300'
               }`}
             >
               ตารางรวม
@@ -434,14 +495,14 @@ export default function App() {
             <button
               type="button"
               onClick={() => setIsBulkModalOpen(true)}
-              className="hover:text-slate-900 hover:underline underline-offset-4 transition-colors whitespace-nowrap shrink-0"
+              className="h-full inline-flex items-center border-b-2 border-transparent hover:text-slate-900 hover:border-slate-300 transition-colors whitespace-nowrap shrink-0"
             >
               นำเข้าหลายรายชื่อ
             </button>
             <button
               type="button"
               onClick={handleExportCSV}
-              className="hover:text-slate-900 hover:underline underline-offset-4 transition-colors whitespace-nowrap shrink-0"
+              className="h-full inline-flex items-center border-b-2 border-transparent hover:text-slate-900 hover:border-slate-300 transition-colors whitespace-nowrap shrink-0"
             >
               ส่งออก CSV
             </button>
@@ -453,7 +514,7 @@ export default function App() {
               onClick={() =>
                 handleOpenAddModal(filterDivision !== 'ALL' ? filterDivision : 'unassigned')
               }
-              className="inline-flex items-center gap-1.5 font-heading bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-xl transition-colors whitespace-nowrap shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+              className="inline-flex items-center gap-1.5 font-heading bg-blue-700 hover:bg-blue-800 text-white text-sm font-medium px-4 py-2 rounded-xl shadow-[0_1px_2px_rgba(29,78,216,0.28)] transition-colors whitespace-nowrap shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-1"
             >
               <Plus className="w-4 h-4" />
               <span>เพิ่มเจ้าหน้าที่</span>
@@ -464,11 +525,91 @@ export default function App() {
 
       {/* Main Workspace */}
       <main id="top" className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6">
-        {/* Single Unified Command & Summary Bar */}
-        <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4 pb-5 border-b border-slate-200/80">
+        {/* Executive Overview Strip */}
+        <section
+          aria-label="ภาพรวมการจัดสรรอัตรากำลัง"
+          className="bg-white border border-slate-200/85 rounded-2xl shadow-[0_1px_2px_rgba(15,23,42,0.03),0_8px_24px_-12px_rgba(15,23,42,0.07)] overflow-hidden"
+        >
+          <div className="grid grid-cols-2 lg:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-slate-200/75">
+            <div className="px-5 py-4">
+              <div className="text-xs font-heading font-medium text-slate-500">
+                อัตรากำลังทั้งหมด
+              </div>
+              <div className="mt-1 flex items-baseline gap-1.5 tabular-nums">
+                <span className="font-heading text-2xl font-bold tracking-tight text-slate-900">
+                  {staffList.length}
+                </span>
+                <span className="text-xs text-slate-500">คน</span>
+              </div>
+              <div className="mt-0.5 text-xs text-slate-400 tabular-nums">
+                รองรับ {regularDivisionCount} กลุ่มงานในสังกัด
+              </div>
+            </div>
+
+            <div className="px-5 py-4">
+              <div className="text-xs font-heading font-medium text-slate-500">
+                จัดสรรเข้ากลุ่มงานแล้ว
+              </div>
+              <div className="mt-1 flex items-baseline gap-1.5 tabular-nums">
+                <span className="font-heading text-2xl font-bold tracking-tight text-blue-700">
+                  {assignedCount}
+                </span>
+                <span className="text-xs text-slate-500">คน</span>
+              </div>
+              <div className="mt-0.5 text-xs text-slate-500 tabular-nums">
+                คิดเป็น {assignmentPercent}% ของทั้งหมด
+              </div>
+            </div>
+
+            <div className="px-5 py-4">
+              <div className="text-xs font-heading font-medium text-slate-500">
+                รอจัดสรรกลุ่มงาน
+              </div>
+              <div className="mt-1 flex items-baseline gap-1.5 tabular-nums">
+                <span
+                  className={`font-heading text-2xl font-bold tracking-tight ${
+                    unassignedCount > 0 ? 'text-amber-700' : 'text-emerald-700'
+                  }`}
+                >
+                  {unassignedCount}
+                </span>
+                <span className="text-xs text-slate-500">คน</span>
+              </div>
+              <div className="mt-0.5 text-xs text-slate-400">
+                {unassignedCount > 0
+                  ? 'เลือกหรือลากวางเข้ากลุ่มงานด้านล่าง'
+                  : 'จัดสรรครบทุกรายชื่อแล้ว'}
+              </div>
+            </div>
+
+            <div className="px-5 py-4">
+              <div className="text-xs font-heading font-medium text-slate-500">
+                ปฏิบัติงานที่อื่น
+              </div>
+              <div className="mt-1 flex items-baseline gap-1.5 tabular-nums">
+                <span
+                  className={`font-heading text-2xl font-bold tracking-tight ${
+                    offsiteCount > 0 ? 'text-amber-700' : 'text-slate-700'
+                  }`}
+                >
+                  {offsiteCount}
+                </span>
+                <span className="text-xs text-slate-500">คน</span>
+              </div>
+              <div className="mt-0.5 text-xs text-slate-400">
+                {offsiteCount > 0
+                  ? 'สังกัดกลุ่มแล้วแต่ปฏิบัติงานนอกพื้นที่'
+                  : 'ปฏิบัติงานตามสังกัดครบทุกคน'}
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Unified Command & Filter Bar */}
+        <div className="bg-white border border-slate-200/85 rounded-2xl px-4 py-3 shadow-[0_1px_2px_rgba(15,23,42,0.03)] flex flex-col xl:flex-row xl:items-center justify-between gap-3.5">
           {/* Left: Search & Division Filter */}
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 flex-1">
-            <div className="relative w-full sm:w-72">
+            <div className="relative w-full sm:w-80">
               <Search
                 className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none"
                 aria-hidden="true"
@@ -477,9 +618,9 @@ export default function App() {
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="ค้นหาชื่อ-สกุล ตำแหน่ง หรือประเภท..."
-                aria-label="ค้นหาชื่อ-สกุล ตำแหน่ง หรือประเภท"
-                className="w-full pl-9 pr-8 py-2 rounded-xl border border-slate-200/90 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm text-slate-900 placeholder:text-slate-400"
+                placeholder="ค้นหาชื่อ-สกุล ตำแหน่ง ประเภท หรือสถานที่ปฏิบัติงาน..."
+                aria-label="ค้นหาชื่อ-สกุล ตำแหน่ง ประเภท หรือสถานที่ปฏิบัติงาน"
+                className="w-full pl-9 pr-8 py-2 rounded-xl border border-slate-200/90 bg-slate-50/75 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 text-sm text-slate-900 placeholder:text-slate-400 transition-colors"
               />
               {searchQuery && (
                 <button
@@ -497,7 +638,7 @@ export default function App() {
               value={filterDivision}
               onChange={(e) => setFilterDivision(e.target.value)}
               aria-label="กรองตามกลุ่มงาน"
-              className="w-full sm:w-80 px-3.5 py-2 rounded-xl border border-slate-200/90 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm text-slate-800"
+              className="w-full sm:w-80 px-3.5 py-2 rounded-xl border border-slate-200/90 bg-slate-50/75 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 text-sm text-slate-800 transition-colors"
             >
               <option value="ALL">แสดงทุกกลุ่มงาน ({staffList.length} คน)</option>
               {divisionsList.map((d) => {
@@ -514,7 +655,7 @@ export default function App() {
               <button
                 type="button"
                 onClick={resetFilters}
-                className="inline-flex items-center justify-center gap-1 px-3 py-2 text-xs font-medium text-slate-600 hover:text-slate-900 bg-slate-200/60 hover:bg-slate-200 rounded-xl transition-colors whitespace-nowrap shrink-0"
+                className="inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-heading font-medium text-blue-700 hover:text-blue-900 bg-blue-50 hover:bg-blue-100/80 rounded-xl transition-colors whitespace-nowrap shrink-0"
               >
                 <RotateCcw className="w-3.5 h-3.5" />
                 <span>ล้างตัวกรอง</span>
@@ -522,31 +663,20 @@ export default function App() {
             )}
           </div>
 
-          {/* Right: Live Metrics, Secondary Actions & View Toggle */}
-          <div className="flex flex-wrap items-center justify-between xl:justify-end gap-3.5">
-            <div className="flex items-center gap-2 text-xs sm:text-sm text-slate-600 tabular-nums">
-              <span>
-                ทั้งหมด <strong className="font-semibold text-slate-900">{staffList.length}</strong>
+          {/* Right: Secondary Actions & View Toggle */}
+          <div className="flex flex-wrap items-center justify-between xl:justify-end gap-2.5">
+            {hasActiveFilter && (
+              <span className="text-xs text-slate-500 tabular-nums mr-1">
+                พบ <strong className="font-semibold text-slate-900">{filteredStaff.length}</strong>{' '}
+                รายการ
               </span>
-              <span aria-hidden="true" className="text-slate-300">
-                ·
-              </span>
-              <span>
-                จัดสรรแล้ว <strong className="font-semibold text-blue-700">{assignedCount}</strong>
-              </span>
-              <span aria-hidden="true" className="text-slate-300">
-                ·
-              </span>
-              <span>
-                รอจัดสรร <strong className="font-semibold text-amber-700">{unassignedCount}</strong>
-              </span>
-            </div>
+            )}
 
             <div className="flex items-center gap-2">
               <button
                 type="button"
                 onClick={() => setIsBulkModalOpen(true)}
-                className="md:hidden inline-flex items-center gap-1.5 font-heading bg-white hover:bg-slate-50 text-slate-700 text-xs font-medium px-3 py-2 rounded-xl border border-slate-200/90 transition-colors whitespace-nowrap shrink-0"
+                className="md:hidden inline-flex items-center gap-1.5 font-heading bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-medium px-3 py-2 rounded-xl border border-slate-200/90 transition-colors whitespace-nowrap shrink-0"
               >
                 <Upload className="w-3.5 h-3.5 text-slate-500" />
                 <span>นำเข้า</span>
@@ -554,7 +684,7 @@ export default function App() {
               <button
                 type="button"
                 onClick={handleExportCSV}
-                className="md:hidden inline-flex items-center gap-1.5 font-heading bg-white hover:bg-slate-50 text-slate-700 text-xs font-medium px-3 py-2 rounded-xl border border-slate-200/90 transition-colors whitespace-nowrap shrink-0"
+                className="md:hidden inline-flex items-center gap-1.5 font-heading bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-medium px-3 py-2 rounded-xl border border-slate-200/90 transition-colors whitespace-nowrap shrink-0"
               >
                 <Download className="w-3.5 h-3.5 text-slate-500" />
                 <span>CSV</span>
@@ -565,7 +695,7 @@ export default function App() {
                   type="button"
                   onClick={() => setIsClearAllModalOpen(true)}
                   title="ล้างรายชื่อทั้งหมดเพื่อเริ่มใหม่"
-                  className="inline-flex items-center gap-1 font-heading text-xs font-medium text-slate-500 hover:text-red-600 px-2.5 py-1.5 rounded-lg hover:bg-red-50/70 transition-colors whitespace-nowrap shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
+                  className="inline-flex items-center gap-1 font-heading text-xs font-medium text-slate-500 hover:text-red-600 px-2.5 py-2 rounded-xl hover:bg-red-50/80 transition-colors whitespace-nowrap shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
                   <span>ล้างข้อมูล</span>
@@ -575,14 +705,14 @@ export default function App() {
               <div
                 role="group"
                 aria-label="สลับมุมมองการแสดงผล"
-                className="inline-flex rounded-xl bg-slate-200/70 p-1 shrink-0"
+                className="inline-flex rounded-xl bg-slate-100 p-1 border border-slate-200/70 shrink-0"
               >
                 <button
                   type="button"
                   onClick={() => setCurrentView(ViewMode.BOARD)}
-                  className={`font-heading px-3 py-1.5 rounded-lg text-xs font-medium transition-colors whitespace-nowrap shrink-0 ${
+                  className={`font-heading px-3.5 py-1.5 rounded-lg text-xs font-medium transition-colors whitespace-nowrap shrink-0 ${
                     currentView === ViewMode.BOARD
-                      ? 'bg-white text-slate-900 shadow-sm'
+                      ? 'bg-white text-blue-700 shadow-xs font-semibold'
                       : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
@@ -591,9 +721,9 @@ export default function App() {
                 <button
                   type="button"
                   onClick={() => setCurrentView(ViewMode.TABLE)}
-                  className={`font-heading px-3 py-1.5 rounded-lg text-xs font-medium transition-colors whitespace-nowrap shrink-0 ${
+                  className={`font-heading px-3.5 py-1.5 rounded-lg text-xs font-medium transition-colors whitespace-nowrap shrink-0 ${
                     currentView === ViewMode.TABLE
-                      ? 'bg-white text-slate-900 shadow-sm'
+                      ? 'bg-white text-blue-700 shadow-xs font-semibold'
                       : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
@@ -613,6 +743,7 @@ export default function App() {
             totalStaffCount={staffList.length}
             onMoveStaff={handleMoveStaff}
             onUpdateLeadershipRole={handleUpdateLeadershipRole}
+            onEditWorkLocation={(staff) => setWorkLocationStaff(staff)}
             onEditStaff={handleOpenEditModal}
             onDeleteStaff={(staff) => setStaffToDelete(staff)}
             onAddInDivision={(divId) => handleOpenAddModal(divId)}
@@ -626,6 +757,7 @@ export default function App() {
             hasActiveFilter={hasActiveFilter}
             onMoveStaff={handleMoveStaff}
             onUpdateLeadershipRole={handleUpdateLeadershipRole}
+            onEditWorkLocation={(staff) => setWorkLocationStaff(staff)}
             onEditStaff={handleOpenEditModal}
             onDeleteStaff={(staff) => setStaffToDelete(staff)}
             onResetFilters={resetFilters}
@@ -638,6 +770,7 @@ export default function App() {
       <StaffModal
         isOpen={isStaffModalOpen}
         divisions={divisionsList}
+        recentLocations={recentWorkLocations}
         editingStaff={editingStaff}
         defaultDivisionId={defaultModalDivisionId}
         onClose={() => {
@@ -645,6 +778,14 @@ export default function App() {
           setEditingStaff(null);
         }}
         onSave={handleSaveStaff}
+      />
+
+      <WorkLocationModal
+        staff={workLocationStaff}
+        divisions={divisionsList}
+        recentLocations={recentWorkLocations}
+        onClose={() => setWorkLocationStaff(null)}
+        onSave={handleSaveWorkLocation}
       />
 
       <DivisionModal

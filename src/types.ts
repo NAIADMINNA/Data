@@ -14,6 +14,7 @@ export interface StaffMember {
   staffType: string;
   divisionId: string;
   leadershipRole?: LeadershipRole;
+  workLocation?: string;
 }
 
 export enum ViewMode {
