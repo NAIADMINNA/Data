@@ -453,7 +453,7 @@ export default function App() {
     <div className="min-h-screen flex flex-col bg-[#f4f6fa] bg-[radial-gradient(ellipse_at_top,_rgba(29,78,216,0.055),_transparent_52%)] text-slate-900">
       {/* Top Bar (Strict 3-Zone Contract) */}
       <header className="sticky top-0 z-30 bg-white/92 backdrop-blur-md border-b border-slate-200/80 shadow-[0_1px_2px_rgba(15,23,42,0.03)]">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-8">
+        <div className="max-w-[1680px] mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-8">
           <a
             href="#top"
             onClick={(e) => {
@@ -524,14 +524,14 @@ export default function App() {
       </header>
 
       {/* Main Workspace */}
-      <main id="top" className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6">
+      <main id="top" className="flex-1 max-w-[1680px] w-full mx-auto px-4 sm:px-6 lg:px-8 py-5 space-y-5">
         {/* Executive Overview Strip */}
         <section
           aria-label="ภาพรวมการจัดสรรอัตรากำลัง"
           className="bg-white border border-slate-200/85 rounded-2xl shadow-[0_1px_2px_rgba(15,23,42,0.03),0_8px_24px_-12px_rgba(15,23,42,0.07)] overflow-hidden"
         >
           <div className="grid grid-cols-2 lg:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-slate-200/75">
-            <div className="px-5 py-4">
+            <div className="px-5 py-3.5">
               <div className="text-xs font-heading font-medium text-slate-500">
                 อัตรากำลังทั้งหมด
               </div>
@@ -546,7 +546,7 @@ export default function App() {
               </div>
             </div>
 
-            <div className="px-5 py-4">
+            <div className="px-5 py-3.5">
               <div className="text-xs font-heading font-medium text-slate-500">
                 จัดสรรเข้ากลุ่มงานแล้ว
               </div>
@@ -561,7 +561,7 @@ export default function App() {
               </div>
             </div>
 
-            <div className="px-5 py-4">
+            <div className="px-5 py-3.5">
               <div className="text-xs font-heading font-medium text-slate-500">
                 รอจัดสรรกลุ่มงาน
               </div>
@@ -577,12 +577,12 @@ export default function App() {
               </div>
               <div className="mt-0.5 text-xs text-slate-400">
                 {unassignedCount > 0
-                  ? 'เลือกหรือลากวางเข้ากลุ่มงานด้านล่าง'
+                  ? 'เลือกหรือลากวางเข้ากลุ่มงานทางขวา'
                   : 'จัดสรรครบทุกรายชื่อแล้ว'}
               </div>
             </div>
 
-            <div className="px-5 py-4">
+            <div className="px-5 py-3.5">
               <div className="text-xs font-heading font-medium text-slate-500">
                 ปฏิบัติงานที่อื่น
               </div>

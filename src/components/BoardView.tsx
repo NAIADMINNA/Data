@@ -48,16 +48,16 @@ export function BoardView({
 }: BoardViewProps) {
   const [draggedStaffId, setDraggedStaffId] = useState<string | null>(null);
   const [activeDropDivId, setActiveDropDivId] = useState<string | null>(null);
-  const [divisionLayout, setDivisionLayout] = useState<'grid2' | 'stack'>('stack');
+  const [divisionLayout, setDivisionLayout] = useState<'grid2' | 'stack'>('grid2');
   const [hideEmptyDivisions, setHideEmptyDivisions] = useState(false);
   const [collapsedDivIds, setCollapsedDivIds] = useState<Record<string, boolean>>({});
   const [poolRoleFilter, setPoolRoleFilter] = useState<string>('ALL');
   const [poolTypeFilter, setPoolTypeFilter] = useState<string>('ALL');
-  const [isPoolExpanded, setIsPoolExpanded] = useState<boolean>(false);
 
   const poolDivision = divisions.find((d) => d.isPool);
   const regularDivisions = divisions.filter((d) => !d.isPool);
   const onlyPoolSelected = divisions.length === 1 && Boolean(divisions[0]?.isPool);
+  const isSplitMode = Boolean(poolDivision) && !onlyPoolSelected;
 
   const populatedDivCount = useMemo(
     () =>
@@ -181,8 +181,14 @@ export function BoardView({
   };
 
   return (
-    <div className="space-y-8">
-      {/* 1. Unassigned Pool Section */}
+    <div
+      className={
+        isSplitMode
+          ? 'grid grid-cols-1 xl:grid-cols-12 gap-6 items-start'
+          : 'space-y-6'
+      }
+    >
+      {/* LEFT PANE: Unassigned Pool Section (Sticky on Desktop Split) */}
       {poolDivision && (() => {
         const poolMembers = filteredStaff.filter((s) => s.divisionId === poolDivision.id);
         const isDropTarget = activeDropDivId === poolDivision.id;
@@ -259,7 +265,9 @@ export function BoardView({
             onDragLeave={(e) => handleDragLeave(e, poolDivision.id)}
             onDrop={(e) => handleDrop(e, poolDivision.id)}
             aria-label={poolDivision.name}
-            className={`bg-white rounded-2xl overflow-hidden transition-all duration-150 ${
+            className={`bg-white rounded-2xl overflow-hidden transition-all duration-150 flex flex-col ${
+              isSplitMode ? 'xl:col-span-5 xl:sticky xl:top-20 xl:max-h-[calc(100vh-6.25rem)]' : ''
+            } ${
               isDropTarget
                 ? 'border-2 border-dashed border-amber-500 bg-amber-50/40 ring-4 ring-amber-500/10'
                 : canAcceptDrop
@@ -267,60 +275,39 @@ export function BoardView({
                   : 'border border-slate-200/85 shadow-[0_1px_2px_rgba(15,23,42,0.03),0_8px_24px_-14px_rgba(15,23,42,0.08)]'
             }`}
           >
-            <div className="px-5 py-4 bg-gradient-to-r from-amber-50/75 via-amber-50/30 to-white border-b border-slate-200/75 flex flex-wrap items-center justify-between gap-3">
-              <div className="flex items-center gap-3.5 min-w-0">
-                <span
-                  className={`w-9 h-9 rounded-xl font-heading text-xs font-bold flex items-center justify-center shrink-0 ${
-                    poolMembers.length > 0
-                      ? 'bg-gradient-to-br from-amber-500 to-amber-600 text-white shadow-[0_2px_6px_rgba(217,119,6,0.28)]'
-                      : 'bg-amber-100/70 text-amber-800 border border-amber-200/70'
-                  }`}
-                >
-                  รอ
-                </span>
-                <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
-                    <h2 className="font-heading font-semibold text-sm sm:text-[15px] text-slate-900 truncate">
-                      รายชื่อรอจัดสรร
-                    </h2>
-                    <span className="text-slate-300" aria-hidden="true">
-                      ·
-                    </span>
-                    <span className="text-xs sm:text-sm text-amber-800 font-medium tabular-nums whitespace-nowrap">
-                      {hasPoolColumnFilter
-                        ? `แสดง ${displayedPoolMembers.length} จาก ${poolMembers.length} คน`
-                        : `${poolMembers.length} คน`}
-                    </span>
-                    {hasPoolColumnFilter && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setPoolRoleFilter('ALL');
-                          setPoolTypeFilter('ALL');
-                        }}
-                        className="inline-flex items-center gap-1 font-heading text-xs font-medium text-blue-700 hover:text-blue-900 bg-blue-50 hover:bg-blue-100/80 px-2.5 py-1 rounded-lg transition-colors whitespace-nowrap shrink-0"
-                      >
-                        <RotateCcw className="w-3 h-3" />
-                        <span>ล้างตัวกรองหัวตาราง</span>
-                      </button>
-                    )}
-                  </div>
-                  <p className="mt-0.5 text-xs text-slate-500">
-                    เลือกกลุ่มงานปลายทางหรือลากแถวรายชื่อไปวางในกลุ่มงานด้านล่าง
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2 shrink-0">
-                {poolMembers.length > 6 && (
-                  <button
-                    type="button"
-                    onClick={() => setIsPoolExpanded((prev) => !prev)}
-                    className="font-heading text-xs font-medium text-slate-600 hover:text-slate-900 bg-white hover:bg-slate-50 border border-slate-200/90 px-3 py-1.5 rounded-xl transition-colors whitespace-nowrap shrink-0"
+            {/* Left Panel Header */}
+            <div className="px-4 sm:px-5 py-3.5 bg-gradient-to-r from-amber-50/80 via-amber-50/35 to-white border-b border-slate-200/75 space-y-3 shrink-0">
+              <div className="flex items-center justify-between gap-2.5">
+                <div className="flex items-center gap-3 min-w-0">
+                  <span
+                    className={`w-9 h-9 rounded-xl font-heading text-xs font-bold flex items-center justify-center shrink-0 ${
+                      poolMembers.length > 0
+                        ? 'bg-gradient-to-br from-amber-500 to-amber-600 text-white shadow-[0_2px_6px_rgba(217,119,6,0.28)]'
+                        : 'bg-amber-100/70 text-amber-800 border border-amber-200/70'
+                    }`}
                   >
-                    {isPoolExpanded ? 'จำกัดความสูงตาราง' : 'ขยายตารางทั้งหมด'}
-                  </button>
-                )}
+                    รอ
+                  </span>
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                      <h2 className="font-heading font-semibold text-sm sm:text-[15px] text-slate-900 truncate">
+                        รายชื่อรอจัดสรร
+                      </h2>
+                      <span className="text-slate-300" aria-hidden="true">
+                        ·
+                      </span>
+                      <span className="text-xs sm:text-sm text-amber-800 font-medium tabular-nums whitespace-nowrap">
+                        {hasPoolColumnFilter
+                          ? `แสดง ${displayedPoolMembers.length} / ${poolMembers.length} คน`
+                          : `${poolMembers.length} คน`}
+                      </span>
+                    </div>
+                    <p className="mt-0.5 text-xs text-slate-500 truncate">
+                      ลากรายชื่อไปวางในการ์ดกลุ่มงานทางขวา หรือเลือกสังกัดจากแถว
+                    </p>
+                  </div>
+                </div>
+
                 <button
                   type="button"
                   onClick={() => onAddInDivision(poolDivision.id)}
@@ -330,101 +317,107 @@ export function BoardView({
                   <span>เพิ่มรายชื่อ</span>
                 </button>
               </div>
+
+              {/* Pinned Filter Bar for ตำแหน่ง & ประเภท */}
+              {poolMembers.length > 0 && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-0.5">
+                  <div className="relative min-w-0">
+                    <select
+                      aria-label="เลือกกรองตามตำแหน่ง"
+                      value={poolRoleFilter}
+                      onChange={(e) => setPoolRoleFilter(e.target.value)}
+                      className={`w-full appearance-none pl-3 pr-7 py-1.5 rounded-xl text-xs transition-colors cursor-pointer truncate focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                        poolRoleFilter !== 'ALL'
+                          ? 'bg-blue-50 border border-blue-400 text-blue-800 font-semibold'
+                          : 'bg-white border border-slate-200/90 text-slate-700 hover:border-slate-300'
+                      }`}
+                    >
+                      <option value="ALL">ตำแหน่ง: ทั้งหมด ({rolePoolBase.length})</option>
+                      {roleOptions.map(([roleName, count]) => (
+                        <option key={roleName} value={roleName}>
+                          {roleName} ({count})
+                        </option>
+                      ))}
+                      {(emptyRoleCount > 0 || poolRoleFilter === '__EMPTY__') && (
+                        <option value="__EMPTY__">ไม่ระบุตำแหน่ง ({emptyRoleCount})</option>
+                      )}
+                    </select>
+                    <ChevronDown
+                      className="w-3.5 h-3.5 text-slate-400 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none"
+                      aria-hidden="true"
+                    />
+                  </div>
+
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <div className="relative flex-1 min-w-0">
+                      <select
+                        aria-label="เลือกกรองตามประเภท"
+                        value={poolTypeFilter}
+                        onChange={(e) => setPoolTypeFilter(e.target.value)}
+                        className={`w-full appearance-none pl-3 pr-7 py-1.5 rounded-xl text-xs transition-colors cursor-pointer truncate focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                          poolTypeFilter !== 'ALL'
+                            ? 'bg-blue-50 border border-blue-400 text-blue-800 font-semibold'
+                            : 'bg-white border border-slate-200/90 text-slate-700 hover:border-slate-300'
+                        }`}
+                      >
+                        <option value="ALL">ประเภท: ทั้งหมด ({typePoolBase.length})</option>
+                        {typeOptions.map(([typeName, count]) => (
+                          <option key={typeName} value={typeName}>
+                            {typeName} ({count})
+                          </option>
+                        ))}
+                        {(emptyTypeCount > 0 || poolTypeFilter === '__EMPTY__') && (
+                          <option value="__EMPTY__">ไม่ระบุประเภท ({emptyTypeCount})</option>
+                        )}
+                      </select>
+                      <ChevronDown
+                        className="w-3.5 h-3.5 text-slate-400 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none"
+                        aria-hidden="true"
+                      />
+                    </div>
+
+                    {hasPoolColumnFilter && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPoolRoleFilter('ALL');
+                          setPoolTypeFilter('ALL');
+                        }}
+                        title="ล้างตัวกรองตำแหน่งและประเภท"
+                        aria-label="ล้างตัวกรองตำแหน่งและประเภท"
+                        className="p-1.5 text-blue-700 hover:text-blue-900 bg-blue-50 hover:bg-blue-100 rounded-xl border border-blue-200/80 transition-colors shrink-0"
+                      >
+                        <RotateCcw className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
 
+            {/* Left Panel Body */}
             {poolMembers.length === 0 ? (
-              <div className="px-5 py-4 flex items-center justify-between gap-3 text-xs text-slate-400">
-                <span>
-                  {isDropTarget
-                    ? 'ปล่อยเมาส์เพื่อย้ายกลับมาพักในรายชื่อรอจัดสรร'
-                    : 'ไม่มีรายชื่อรอจัดสรร · ลากรายชื่อจากกลุ่มงานมาวางที่นี่หากต้องการพักสังกัด'}
-                </span>
+              <div className="px-5 py-8 text-center text-xs text-slate-400 leading-relaxed">
+                {isDropTarget
+                  ? 'ปล่อยเมาส์เพื่อย้ายกลับมาพักในรายชื่อรอจัดสรร'
+                  : 'ไม่มีรายชื่อรอจัดสรร · ลากรายชื่อจากกลุ่มงานทางขวามาวางที่นี่หากต้องการพักสังกัด'}
               </div>
-            ) : (
-              <div
-                className={`overflow-x-auto subtle-scrollbar ${
-                  isPoolExpanded ? '' : 'max-h-[320px] overflow-y-auto'
-                }`}
-              >
+            ) : isSplitMode ? (
+              /* Compact Zero-Overflow Table for Left Sticky Panel */
+              <div className="flex-1 overflow-y-auto overflow-x-auto max-h-[380px] xl:max-h-none subtle-scrollbar">
                 <table className="w-full text-sm text-left">
                   <thead className="sticky top-0 z-10 bg-slate-50/95 backdrop-blur-xs border-b border-slate-200/80 text-slate-600 font-heading text-xs">
                     <tr>
-                      <th scope="col" className="px-4 py-2.5 w-14 text-right tabular-nums whitespace-nowrap">
+                      <th scope="col" className="px-3 py-2.5 w-12 text-right tabular-nums whitespace-nowrap">
                         ลำดับ
                       </th>
-                      <th scope="col" className="px-4 py-2.5 whitespace-nowrap">
-                        ชื่อ-สกุล
+                      <th scope="col" className="px-3 py-2.5 whitespace-nowrap">
+                        รายชื่อ · ตำแหน่ง · ประเภท
                       </th>
-                      <th scope="col" className="px-3 py-2 min-w-[200px] whitespace-nowrap">
-                        <div className="flex items-center gap-2">
-                          <span className="shrink-0 text-slate-700">ตำแหน่ง</span>
-                          <div className="relative min-w-0 flex-1 max-w-[200px]">
-                            <select
-                              aria-label="เลือกกรองตามตำแหน่ง"
-                              value={poolRoleFilter}
-                              onChange={(e) => setPoolRoleFilter(e.target.value)}
-                              className={`w-full appearance-none pl-2.5 pr-6 py-1 rounded-lg text-xs font-normal transition-colors cursor-pointer truncate focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                                poolRoleFilter !== 'ALL'
-                                  ? 'bg-blue-50 border border-blue-400 text-blue-800 font-medium'
-                                  : 'bg-white border border-slate-200/90 text-slate-700 hover:border-slate-300'
-                              }`}
-                            >
-                              <option value="ALL">ทั้งหมด ({rolePoolBase.length})</option>
-                              {roleOptions.map(([roleName, count]) => (
-                                <option key={roleName} value={roleName}>
-                                  {roleName} ({count})
-                                </option>
-                              ))}
-                              {(emptyRoleCount > 0 || poolRoleFilter === '__EMPTY__') && (
-                                <option value="__EMPTY__">
-                                  ไม่ระบุตำแหน่ง ({emptyRoleCount})
-                                </option>
-                              )}
-                            </select>
-                            <ChevronDown
-                              className="w-3.5 h-3.5 text-slate-400 absolute right-1.5 top-1/2 -translate-y-1/2 pointer-events-none"
-                              aria-hidden="true"
-                            />
-                          </div>
-                        </div>
+                      <th scope="col" className="px-3 py-2.5 w-44 min-w-[155px] whitespace-nowrap">
+                        จัดสรรเข้ากลุ่มงาน
                       </th>
-                      <th scope="col" className="px-3 py-2 min-w-[170px] whitespace-nowrap">
-                        <div className="flex items-center gap-2">
-                          <span className="shrink-0 text-slate-700">ประเภท</span>
-                          <div className="relative min-w-0 flex-1 max-w-[165px]">
-                            <select
-                              aria-label="เลือกกรองตามประเภท"
-                              value={poolTypeFilter}
-                              onChange={(e) => setPoolTypeFilter(e.target.value)}
-                              className={`w-full appearance-none pl-2.5 pr-6 py-1 rounded-lg text-xs font-normal transition-colors cursor-pointer truncate focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                                poolTypeFilter !== 'ALL'
-                                  ? 'bg-blue-50 border border-blue-400 text-blue-800 font-medium'
-                                  : 'bg-white border border-slate-200/90 text-slate-700 hover:border-slate-300'
-                              }`}
-                            >
-                              <option value="ALL">ทั้งหมด ({typePoolBase.length})</option>
-                              {typeOptions.map(([typeName, count]) => (
-                                <option key={typeName} value={typeName}>
-                                  {typeName} ({count})
-                                </option>
-                              ))}
-                              {(emptyTypeCount > 0 || poolTypeFilter === '__EMPTY__') && (
-                                <option value="__EMPTY__">
-                                  ไม่ระบุประเภท ({emptyTypeCount})
-                                </option>
-                              )}
-                            </select>
-                            <ChevronDown
-                              className="w-3.5 h-3.5 text-slate-400 absolute right-1.5 top-1/2 -translate-y-1/2 pointer-events-none"
-                              aria-hidden="true"
-                            />
-                          </div>
-                        </div>
-                      </th>
-                      <th scope="col" className="px-4 py-2.5 w-72 min-w-[220px] whitespace-nowrap">
-                        เลือกจัดสรรกลุ่มงาน
-                      </th>
-                      <th scope="col" className="px-4 py-2.5 w-24 text-center whitespace-nowrap">
+                      <th scope="col" className="px-2.5 py-2.5 w-16 text-center whitespace-nowrap">
                         จัดการ
                       </th>
                     </tr>
@@ -432,8 +425,8 @@ export function BoardView({
                   <tbody className="divide-y divide-slate-100">
                     {displayedPoolMembers.length === 0 ? (
                       <tr>
-                        <td colSpan={6} className="px-4 py-8 text-center text-xs text-slate-500">
-                          <span>ไม่พบรายชื่อรอจัดสรรที่ตรงกับตำแหน่งหรือประเภทที่เลือก</span>
+                        <td colSpan={4} className="px-4 py-8 text-center text-xs text-slate-500">
+                          <span>ไม่พบรายชื่อที่ตรงกับตำแหน่งหรือประเภทที่เลือก</span>
                           <button
                             type="button"
                             onClick={() => {
@@ -455,34 +448,47 @@ export function BoardView({
                             draggable
                             onDragStart={(e) => handleDragStart(e, person.id)}
                             onDragEnd={handleDragEnd}
-                            className={`group hover:bg-amber-50/25 cursor-grab active:cursor-grabbing transition-colors ${
+                            className={`group hover:bg-amber-50/35 cursor-grab active:cursor-grabbing transition-colors ${
                               isDragging ? 'opacity-35' : 'opacity-100'
                             }`}
                           >
-                            <td className="px-4 py-2.5 text-right text-slate-400 tabular-nums whitespace-nowrap">
-                              <div className="inline-flex items-center justify-end gap-1.5">
+                            <td className="px-3 py-2.5 text-right text-slate-400 tabular-nums whitespace-nowrap align-top">
+                              <div className="inline-flex items-center justify-end gap-1 mt-1">
                                 <GripVertical
                                   className="w-3.5 h-3.5 text-slate-300 group-hover:text-amber-500 shrink-0 transition-colors"
                                   aria-hidden="true"
                                 />
-                                <span>{idx + 1}</span>
+                                <span className="text-xs">{idx + 1}</span>
                               </div>
                             </td>
-                            <td className="px-4 py-2.5">
-                              <div className="flex items-center gap-2.5 min-w-0">
-                                <div className="w-7 h-7 rounded-full bg-amber-100/70 text-amber-900 font-heading text-xs font-semibold flex items-center justify-center shrink-0">
+                            <td className="px-3 py-2.5 align-top">
+                              <div className="flex items-start gap-2.5 min-w-0">
+                                <div className="w-7 h-7 mt-0.5 rounded-full bg-amber-100/80 text-amber-900 font-heading text-xs font-semibold flex items-center justify-center shrink-0">
                                   {getThaiInitial(person.name)}
                                 </div>
-                                <span className="font-medium text-slate-900">{person.name}</span>
+                                <div className="min-w-0">
+                                  <div className="font-medium text-slate-900 leading-snug">
+                                    {person.name}
+                                  </div>
+                                  <div className="mt-0.5 text-xs text-slate-500 flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
+                                    <span>{person.role || 'ไม่ระบุตำแหน่ง'}</span>
+                                    {person.staffType && (
+                                      <>
+                                        <span className="text-slate-300" aria-hidden="true">
+                                          ·
+                                        </span>
+                                        <span className="text-slate-600 font-medium">
+                                          {person.staffType}
+                                        </span>
+                                      </>
+                                    )}
+                                  </div>
+                                </div>
                               </div>
                             </td>
-                            <td className="px-3 py-2.5 text-slate-600">{person.role || '-'}</td>
-                            <td className="px-3 py-2.5 text-slate-600 whitespace-nowrap">
-                              {person.staffType || '-'}
-                            </td>
-                            <td className="px-4 py-2">{renderMoveSelector(person)}</td>
-                            <td className="px-4 py-2.5 text-center whitespace-nowrap">
-                              <div className="inline-flex items-center justify-center gap-1">
+                            <td className="px-3 py-2 align-middle">{renderMoveSelector(person)}</td>
+                            <td className="px-2.5 py-2.5 text-center whitespace-nowrap align-middle">
+                              <div className="inline-flex items-center justify-center gap-0.5">
                                 <button
                                   type="button"
                                   onClick={() => onEditStaff(person)}
@@ -510,15 +516,114 @@ export function BoardView({
                   </tbody>
                 </table>
               </div>
+            ) : (
+              /* Full-Width 6-Column Table when only Unassigned Pool is selected */
+              <div className="overflow-x-auto subtle-scrollbar">
+                <table className="w-full text-sm text-left">
+                  <thead className="sticky top-0 z-10 bg-slate-50/95 backdrop-blur-xs border-b border-slate-200/80 text-slate-600 font-heading text-xs">
+                    <tr>
+                      <th scope="col" className="px-4 py-2.5 w-14 text-right tabular-nums whitespace-nowrap">
+                        ลำดับ
+                      </th>
+                      <th scope="col" className="px-4 py-2.5 whitespace-nowrap">
+                        ชื่อ-สกุล
+                      </th>
+                      <th scope="col" className="px-4 py-2.5 whitespace-nowrap">
+                        ตำแหน่ง
+                      </th>
+                      <th scope="col" className="px-4 py-2.5 whitespace-nowrap">
+                        ประเภท
+                      </th>
+                      <th scope="col" className="px-4 py-2.5 w-72 min-w-[220px] whitespace-nowrap">
+                        เลือกจัดสรรกลุ่มงาน
+                      </th>
+                      <th scope="col" className="px-4 py-2.5 w-24 text-center whitespace-nowrap">
+                        จัดการ
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {displayedPoolMembers.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="px-4 py-8 text-center text-xs text-slate-500">
+                          <span>ไม่พบรายชื่อรอจัดสรรที่ตรงกับตำแหน่งหรือประเภทที่เลือก</span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setPoolRoleFilter('ALL');
+                              setPoolTypeFilter('ALL');
+                            }}
+                            className="ml-2 font-heading font-medium text-blue-600 hover:underline"
+                          >
+                            แสดงทั้งหมด ({poolMembers.length} คน)
+                          </button>
+                        </td>
+                      </tr>
+                    ) : (
+                      displayedPoolMembers.map((person, idx) => (
+                        <tr
+                          key={person.id}
+                          className="group hover:bg-amber-50/25 transition-colors"
+                        >
+                          <td className="px-4 py-2.5 text-right text-slate-400 tabular-nums whitespace-nowrap">
+                            {idx + 1}
+                          </td>
+                          <td className="px-4 py-2.5">
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <div className="w-7 h-7 rounded-full bg-amber-100/80 text-amber-900 font-heading text-xs font-semibold flex items-center justify-center shrink-0">
+                                {getThaiInitial(person.name)}
+                              </div>
+                              <span className="font-medium text-slate-900">{person.name}</span>
+                            </div>
+                          </td>
+                          <td className="px-4 py-2.5 text-slate-600">{person.role || '-'}</td>
+                          <td className="px-4 py-2.5 text-slate-600 whitespace-nowrap">
+                            {person.staffType || '-'}
+                          </td>
+                          <td className="px-4 py-2">{renderMoveSelector(person)}</td>
+                          <td className="px-4 py-2.5 text-center whitespace-nowrap">
+                            <div className="inline-flex items-center justify-center gap-1">
+                              <button
+                                type="button"
+                                onClick={() => onEditStaff(person)}
+                                title="แก้ไขข้อมูล"
+                                aria-label={`แก้ไขข้อมูล ${person.name}`}
+                                className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                              >
+                                <Pencil className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => onDeleteStaff(person)}
+                                title="ลบรายชื่อ"
+                                aria-label={`ลบรายชื่อ ${person.name}`}
+                                className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {isDropTarget && poolMembers.length > 0 && (
+              <div className="px-4 py-2 bg-amber-50 border-t border-amber-200/80 text-center text-xs font-heading font-medium text-amber-800 shrink-0">
+                ปล่อยเมาส์เพื่อย้ายกลับมาพักในรายชื่อรอจัดสรร
+              </div>
             )}
           </section>
         );
       })()}
 
-      {/* 2. Active Divisions Section */}
+      {/* RIGHT PANE: Active Divisions Section */}
       {!onlyPoolSelected && (
-        <div className="space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-1">
+        <div className={`space-y-4 min-w-0 ${isSplitMode ? 'xl:col-span-7' : ''}`}>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
               <h2 className="font-heading text-base sm:text-lg font-bold text-slate-900">
                 กลุ่มงานในสังกัด
@@ -533,7 +638,7 @@ export function BoardView({
               </span>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+            <div className="flex flex-wrap items-center gap-2 shrink-0">
               <button
                 type="button"
                 onClick={onAddDivision}
@@ -549,7 +654,7 @@ export function BoardView({
                   onClick={() => setHideEmptyDivisions((prev) => !prev)}
                   className={`font-heading px-3 py-1.5 rounded-xl text-xs font-medium border transition-colors whitespace-nowrap shrink-0 ${
                     hideEmptyDivisions
-                      ? 'bg-blue-600 border-blue-600 text-white'
+                      ? 'bg-blue-700 border-blue-700 text-white'
                       : 'bg-white border-slate-200/90 text-slate-600 hover:text-slate-900 hover:border-slate-300'
                   }`}
                 >
@@ -565,27 +670,27 @@ export function BoardView({
                 >
                   <button
                     type="button"
-                    onClick={() => setDivisionLayout('stack')}
-                    className={`inline-flex items-center gap-1.5 font-heading px-3 py-1 rounded-lg text-xs font-medium transition-colors whitespace-nowrap shrink-0 ${
-                      divisionLayout === 'stack'
-                        ? 'bg-white text-slate-900 shadow-sm'
-                        : 'text-slate-600 hover:text-slate-900'
-                    }`}
-                  >
-                    <Rows3 className="w-3.5 h-3.5" aria-hidden="true" />
-                    <span>แถวตาราง</span>
-                  </button>
-                  <button
-                    type="button"
                     onClick={() => setDivisionLayout('grid2')}
                     className={`inline-flex items-center gap-1.5 font-heading px-3 py-1 rounded-lg text-xs font-medium transition-colors whitespace-nowrap shrink-0 ${
                       divisionLayout === 'grid2'
-                        ? 'bg-white text-slate-900 shadow-sm'
+                        ? 'bg-white text-blue-700 shadow-xs font-semibold'
                         : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >
                     <LayoutGrid className="w-3.5 h-3.5" aria-hidden="true" />
-                    <span>2 คอลัมน์</span>
+                    <span>การ์ด 2 คอลัมน์</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDivisionLayout('stack')}
+                    className={`inline-flex items-center gap-1.5 font-heading px-3 py-1 rounded-lg text-xs font-medium transition-colors whitespace-nowrap shrink-0 ${
+                      divisionLayout === 'stack'
+                        ? 'bg-white text-blue-700 shadow-xs font-semibold'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    <Rows3 className="w-3.5 h-3.5" aria-hidden="true" />
+                    <span>ตารางเต็มแถว</span>
                   </button>
                 </div>
               )}
@@ -598,7 +703,7 @@ export function BoardView({
               <button
                 type="button"
                 onClick={onAddDivision}
-                className="mt-3 inline-flex items-center gap-1.5 font-heading px-4 py-2 rounded-xl text-xs font-medium bg-blue-600 hover:bg-blue-700 text-white transition-colors whitespace-nowrap shrink-0"
+                className="mt-3 inline-flex items-center gap-1.5 font-heading px-4 py-2 rounded-xl text-xs font-medium bg-blue-700 hover:bg-blue-800 text-white transition-colors whitespace-nowrap shrink-0"
               >
                 <Plus className="w-3.5 h-3.5" />
                 <span>เพิ่มกลุ่มงานแรก</span>
@@ -621,8 +726,8 @@ export function BoardView({
             <div
               className={
                 divisionLayout === 'grid2' && displayedRegularDivisions.length > 1
-                  ? 'grid grid-cols-1 lg:grid-cols-2 gap-4 items-stretch'
-                  : 'space-y-3'
+                  ? 'grid grid-cols-1 md:grid-cols-2 gap-4 items-stretch'
+                  : 'space-y-3.5'
               }
             >
               {displayedRegularDivisions.map((div) => {
@@ -640,7 +745,9 @@ export function BoardView({
 
                 const groupHeads = members.filter((m) => m.leadershipRole === 'หัวหน้ากลุ่ม');
                 const sectionHeads = members.filter((m) => m.leadershipRole === 'หัวหน้าฝ่าย');
-                const offsiteCount = members.filter((m) => Boolean((m.workLocation || '').trim())).length;
+                const offsiteCount = members.filter((m) =>
+                  Boolean((m.workLocation || '').trim())
+                ).length;
 
                 const typeCounts: Record<string, number> = {};
                 members.forEach((m) => {
@@ -652,6 +759,9 @@ export function BoardView({
                 const typeSummaryParts = Object.entries(typeCounts).map(
                   ([typeName, count]) => `${typeName} ${count}`
                 );
+
+                const isCompactCard =
+                  divisionLayout === 'grid2' && displayedRegularDivisions.length > 1;
 
                 return (
                   <section
@@ -672,33 +782,33 @@ export function BoardView({
                   >
                     {/* Division Header */}
                     <div
-                      className={`px-5 py-4 flex items-center justify-between gap-3 ${
+                      className={`px-4 py-4 flex items-start justify-between gap-2.5 ${
                         hasMembers
-                          ? 'bg-gradient-to-r from-slate-50/90 via-blue-50/35 to-white border-b border-slate-200/75'
-                          : divisionLayout === 'grid2'
-                            ? 'bg-slate-50/55 border-b border-slate-100'
-                            : 'bg-white'
+                          ? 'bg-gradient-to-r from-blue-50/95 via-slate-50/80 to-white border-b border-blue-200/70'
+                          : isCompactCard
+                            ? 'bg-slate-100/75 border-b border-slate-200/80'
+                            : 'bg-slate-50/90 border-b border-slate-200/75'
                       }`}
                     >
-                      <div className="flex items-center gap-3.5 min-w-0 flex-1">
+                      <div className="flex items-start gap-3 min-w-0 flex-1">
                         <span
-                          className={`w-9 h-9 rounded-xl font-heading text-xs font-bold tabular-nums flex items-center justify-center shrink-0 ${
+                          className={`w-9 h-9 rounded-xl font-heading text-sm font-bold tabular-nums flex items-center justify-center shrink-0 mt-0.5 ${
                             hasMembers
-                              ? 'bg-gradient-to-br from-blue-600 to-blue-700 text-white shadow-[0_2px_6px_rgba(37,99,235,0.28)]'
-                              : 'bg-slate-100/90 text-slate-500 border border-slate-200/80'
+                              ? 'bg-gradient-to-br from-blue-700 to-blue-800 text-white shadow-[0_2px_6px_rgba(29,78,216,0.28)]'
+                              : 'bg-blue-100/90 text-blue-900 border border-blue-200/80'
                           }`}
                         >
                           {paddedNum}
                         </span>
                         <div className="min-w-0 flex-1">
                           <h3
-                            className={`font-heading font-semibold text-sm sm:text-[15px] leading-snug ${
-                              hasMembers ? 'text-slate-900' : 'text-slate-700'
+                            className={`font-heading font-bold text-[15px] sm:text-base tracking-[-0.01em] leading-snug ${
+                              hasMembers ? 'text-slate-950' : 'text-slate-900'
                             }`}
                           >
                             {div.name}
                           </h3>
-                          <div className="mt-0.5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs tabular-nums">
+                          <div className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs tabular-nums">
                             {hasMembers ? (
                               <>
                                 <span className="text-blue-700 font-medium">
@@ -710,7 +820,7 @@ export function BoardView({
                                       ·
                                     </span>
                                     <span className="text-amber-700 font-medium">
-                                      ปฏิบัติงานที่อื่น {offsiteCount} คน
+                                      ปฏิบัติงานที่อื่น {offsiteCount}
                                     </span>
                                   </>
                                 )}
@@ -746,41 +856,46 @@ export function BoardView({
                             ) : (
                               <span
                                 className={
-                                  isDropTarget ? 'text-blue-600 font-medium' : 'text-slate-400'
+                                  isDropTarget ? 'text-blue-700 font-medium' : 'text-slate-400'
                                 }
                               >
                                 {isDropTarget
                                   ? 'ปล่อยเมาส์เพื่อจัดสรรเข้ากลุ่มงานนี้'
-                                  : 'ยังไม่มีผู้สังกัด · ลากรายชื่อมาวางที่นี่เพื่อจัดสรร'}
+                                  : 'ยังไม่มีผู้สังกัด · ลากรายชื่อมาวางที่นี่'}
                               </span>
                             )}
                           </div>
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-1.5 shrink-0">
+                      <div className="flex items-center gap-1 shrink-0">
                         <button
                           type="button"
                           onClick={() => onEditDivision(div)}
                           title={`แก้ไขชื่อ ${div.name}`}
                           aria-label={`แก้ไขชื่อ ${div.name}`}
-                          className="inline-flex items-center gap-1 font-heading text-xs font-medium px-2.5 py-1.5 rounded-lg border border-slate-200/80 bg-white text-slate-600 hover:text-slate-900 hover:bg-slate-50 hover:border-slate-300 transition-colors whitespace-nowrap shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                          className={`inline-flex items-center gap-1 font-heading text-xs font-medium rounded-lg border border-slate-200/80 bg-white text-slate-600 hover:text-slate-900 hover:bg-slate-50 hover:border-slate-300 transition-colors whitespace-nowrap shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
+                            isCompactCard ? 'p-1.5' : 'px-2.5 py-1.5'
+                          }`}
                         >
                           <Pencil className="w-3.5 h-3.5 text-slate-400" />
-                          <span className="hidden sm:inline">แก้ไขชื่อ</span>
+                          {!isCompactCard && <span className="hidden sm:inline">แก้ไขชื่อ</span>}
                         </button>
                         <button
                           type="button"
                           onClick={() => onAddInDivision(div.id)}
                           title={`เพิ่มเจ้าหน้าที่ใน ${div.name}`}
-                          className={`inline-flex items-center gap-1 font-heading text-xs font-medium px-3 py-1.5 rounded-lg border transition-colors whitespace-nowrap shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
+                          aria-label={`เพิ่มเจ้าหน้าที่ใน ${div.name}`}
+                          className={`inline-flex items-center gap-1 font-heading text-xs font-medium rounded-lg border transition-colors whitespace-nowrap shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
+                            isCompactCard ? 'px-2 py-1.5' : 'px-3 py-1.5'
+                          } ${
                             hasMembers
-                              ? 'bg-white border-slate-200/90 text-blue-600 hover:bg-blue-50 hover:border-blue-200'
-                              : 'bg-slate-50/70 border-slate-200/80 text-slate-600 hover:bg-white hover:text-blue-600 hover:border-blue-200'
+                              ? 'bg-white border-slate-200/90 text-blue-700 hover:bg-blue-50 hover:border-blue-200'
+                              : 'bg-slate-50/70 border-slate-200/80 text-slate-600 hover:bg-white hover:text-blue-700 hover:border-blue-200'
                           }`}
                         >
                           <Plus className="w-3.5 h-3.5" />
-                          <span>เพิ่มรายชื่อ</span>
+                          <span>{isCompactCard ? 'เพิ่ม' : 'เพิ่มรายชื่อ'}</span>
                         </button>
                         {hasMembers && (
                           <button
@@ -803,35 +918,35 @@ export function BoardView({
 
                     {/* Division Body */}
                     {!hasMembers ? (
-                      divisionLayout === 'grid2' ? (
+                      isCompactCard ? (
                         <div
-                          className={`flex-1 min-h-[96px] px-5 py-4 flex items-center justify-center text-center text-xs transition-colors ${
+                          className={`flex-1 min-h-[76px] px-4 py-4 flex items-center justify-center text-center text-xs transition-colors ${
                             isDropTarget
-                              ? 'bg-blue-50/50 text-blue-700 font-medium'
+                              ? 'bg-blue-50/55 text-blue-700 font-medium'
                               : 'bg-slate-50/20 text-slate-400'
                           }`}
                         >
                           {isDropTarget
                             ? `ปล่อยเมาส์เพื่อจัดสรรเข้ากลุ่มงานที่ ${div.num}`
-                            : 'พื้นที่ว่างสำหรับจัดสรรรายชื่อ'}
+                            : 'พื้นที่ว่างสำหรับลากวางรายชื่อ'}
                         </div>
                       ) : null
                     ) : isCollapsed ? (
-                      <div className="px-5 py-2.5 bg-white text-xs text-slate-500 flex items-center justify-between">
+                      <div className="px-4 py-2.5 bg-white text-xs text-slate-500 flex items-center justify-between">
                         <span>ซ่อนรายชื่อไว้ชั่วคราว ({members.length} คน)</span>
                         <button
                           type="button"
                           onClick={() => toggleCollapseDivision(div.id)}
-                          className="font-heading font-medium text-blue-600 hover:underline whitespace-nowrap shrink-0"
+                          className="font-heading font-medium text-blue-700 hover:underline whitespace-nowrap shrink-0"
                         >
                           แสดงรายชื่อ
                         </button>
                       </div>
-                    ) : divisionLayout === 'stack' ? (
-                      /* Full-Width Spacious Table */
-                      <div className="overflow-x-auto bg-white">
+                    ) : !isCompactCard ? (
+                      /* Full-Width Spacious Table (1-column stack mode) */
+                      <div className="overflow-x-auto subtle-scrollbar bg-white">
                         <table className="w-full text-sm text-left">
-                          <thead className="bg-slate-50/50 border-b border-slate-100 text-slate-500 font-heading text-xs">
+                          <thead className="bg-slate-50/60 border-b border-slate-100 text-slate-500 font-heading text-xs">
                             <tr>
                               <th
                                 scope="col"
@@ -848,10 +963,10 @@ export function BoardView({
                               <th scope="col" className="px-4 py-2.5 whitespace-nowrap">
                                 ประเภท
                               </th>
-                              <th scope="col" className="px-4 py-2.5 w-44 min-w-[155px] whitespace-nowrap">
+                              <th scope="col" className="px-4 py-2.5 w-40 min-w-[145px] whitespace-nowrap">
                                 บทบาทในกลุ่มงาน
                               </th>
-                              <th scope="col" className="px-4 py-2.5 w-64 min-w-[210px] whitespace-nowrap">
+                              <th scope="col" className="px-4 py-2.5 w-56 min-w-[180px] whitespace-nowrap">
                                 ย้ายสังกัดกลุ่มงาน
                               </th>
                               <th scope="col" className="px-4 py-2.5 w-28 text-center whitespace-nowrap">
@@ -998,7 +1113,7 @@ export function BoardView({
                         )}
                       </div>
                     ) : (
-                      /* Symmetrical 2-Column Structured Roster Rows */
+                      /* Symmetrical 2-Column Division Cards (2-Tier Clean Member Rows — Zero Overflow) */
                       <div className="divide-y divide-slate-100 flex-1 bg-white">
                         {members.map((person, idx) => {
                           const isDragging = draggedStaffId === person.id;
@@ -1010,7 +1125,7 @@ export function BoardView({
                               draggable
                               onDragStart={(e) => handleDragStart(e, person.id)}
                               onDragEnd={handleDragEnd}
-                              className={`group px-5 py-3 hover:bg-blue-50/25 cursor-grab active:cursor-grabbing transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 ${
+                              className={`group px-4 py-3 hover:bg-blue-50/25 cursor-grab active:cursor-grabbing transition-colors space-y-2 ${
                                 isDragging ? 'opacity-35' : 'opacity-100'
                               } ${
                                 leaderRole === 'หัวหน้ากลุ่ม'
@@ -1020,112 +1135,122 @@ export function BoardView({
                                     : ''
                               }`}
                             >
-                              <div className="flex items-start gap-2.5 min-w-0 flex-1">
-                                <GripVertical
-                                  className="w-3.5 h-3.5 mt-1.5 text-slate-300 group-hover:text-blue-500 shrink-0 transition-colors"
-                                  aria-hidden="true"
-                                />
-                                <span className="text-xs mt-1 text-slate-400 tabular-nums w-4 text-right shrink-0">
-                                  {idx + 1}.
-                                </span>
-                                <div
-                                  className={`w-7 h-7 mt-0.5 rounded-full font-heading text-xs font-semibold flex items-center justify-center shrink-0 ${
-                                    leaderRole === 'หัวหน้ากลุ่ม'
-                                      ? 'bg-blue-600 text-white'
-                                      : leaderRole === 'หัวหน้าฝ่าย'
-                                        ? 'bg-indigo-600 text-white'
-                                        : 'bg-blue-50 text-blue-700'
-                                  }`}
-                                >
-                                  {getThaiInitial(person.name)}
+                              <div className="flex items-start justify-between gap-2">
+                                <div className="flex items-start gap-2 min-w-0 flex-1">
+                                  <GripVertical
+                                    className="w-3.5 h-3.5 mt-1 text-slate-300 group-hover:text-blue-500 shrink-0 transition-colors"
+                                    aria-hidden="true"
+                                  />
+                                  <span className="text-xs mt-0.5 text-slate-400 tabular-nums w-4 text-right shrink-0">
+                                    {idx + 1}.
+                                  </span>
+                                  <div
+                                    className={`w-6 h-6 mt-0.5 rounded-full font-heading text-[11px] font-semibold flex items-center justify-center shrink-0 ${
+                                      leaderRole === 'หัวหน้ากลุ่ม'
+                                        ? 'bg-blue-600 text-white'
+                                        : leaderRole === 'หัวหน้าฝ่าย'
+                                          ? 'bg-indigo-600 text-white'
+                                          : 'bg-blue-50 text-blue-700'
+                                    }`}
+                                  >
+                                    {getThaiInitial(person.name)}
+                                  </div>
+                                  <div className="min-w-0 flex-1">
+                                    <div className="flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5">
+                                      <span className="font-medium text-sm text-slate-900">
+                                        {person.name}
+                                      </span>
+                                      {leaderRole && (
+                                        <>
+                                          <span className="text-slate-300" aria-hidden="true">
+                                            ·
+                                          </span>
+                                          <span
+                                            className={`text-xs font-heading font-semibold whitespace-nowrap shrink-0 ${
+                                              leaderRole === 'หัวหน้าฝ่าย'
+                                                ? 'text-indigo-700'
+                                                : 'text-blue-700'
+                                            }`}
+                                          >
+                                            {leaderRole}
+                                          </span>
+                                        </>
+                                      )}
+                                    </div>
+                                    <div className="text-xs text-slate-500 flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
+                                      <span>{person.role || 'ไม่ระบุตำแหน่ง'}</span>
+                                      {person.staffType && (
+                                        <>
+                                          <span className="text-slate-300" aria-hidden="true">
+                                            ·
+                                          </span>
+                                          <span className="text-slate-600 shrink-0">
+                                            {person.staffType}
+                                          </span>
+                                        </>
+                                      )}
+                                    </div>
+                                    {offsiteLocation && (
+                                      <button
+                                        type="button"
+                                        onClick={() => onEditWorkLocation(person)}
+                                        title="คลิกเพื่อแก้ไขหรือยกเลิกสถานที่ปฏิบัติงานจริง"
+                                        className="mt-0.5 inline-flex items-center gap-1 text-xs text-amber-700 hover:text-amber-900 hover:underline text-left max-w-full"
+                                      >
+                                        <MapPin
+                                          className="w-3 h-3 shrink-0 text-amber-600"
+                                          aria-hidden="true"
+                                        />
+                                        <span className="truncate">
+                                          ปฏิบัติงานที่: {offsiteLocation}
+                                        </span>
+                                      </button>
+                                    )}
+                                  </div>
                                 </div>
-                                <div className="min-w-0 flex-1">
-                                  <div className="flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5">
-                                    <span className="font-medium text-sm text-slate-900 truncate">
-                                      {person.name}
-                                    </span>
-                                    {leaderRole && (
-                                      <>
-                                        <span className="text-slate-300" aria-hidden="true">
-                                          ·
-                                        </span>
-                                        <span
-                                          className={`text-xs font-heading font-semibold whitespace-nowrap shrink-0 ${
-                                            leaderRole === 'หัวหน้าฝ่าย'
-                                              ? 'text-indigo-700'
-                                              : 'text-blue-700'
-                                          }`}
-                                        >
-                                          {leaderRole}
-                                        </span>
-                                      </>
-                                    )}
-                                  </div>
-                                  <div className="text-xs text-slate-500 flex flex-wrap items-center gap-x-1.5 truncate">
-                                    <span className="truncate">{person.role || 'ไม่ระบุตำแหน่ง'}</span>
-                                    {person.staffType && (
-                                      <>
-                                        <span className="text-slate-300" aria-hidden="true">
-                                          ·
-                                        </span>
-                                        <span className="text-slate-600 shrink-0">
-                                          {person.staffType}
-                                        </span>
-                                      </>
-                                    )}
-                                  </div>
-                                  {offsiteLocation && (
-                                    <button
-                                      type="button"
-                                      onClick={() => onEditWorkLocation(person)}
-                                      title="คลิกเพื่อแก้ไขหรือยกเลิกสถานที่ปฏิบัติงานจริง"
-                                      className="mt-0.5 inline-flex items-center gap-1 text-xs text-amber-700 hover:text-amber-900 hover:underline text-left max-w-full"
-                                    >
-                                      <MapPin className="w-3 h-3 shrink-0 text-amber-600" aria-hidden="true" />
-                                      <span className="truncate">ปฏิบัติงานที่: {offsiteLocation}</span>
-                                    </button>
-                                  )}
+
+                                <div className="flex items-center gap-0.5 shrink-0">
+                                  <button
+                                    type="button"
+                                    onClick={() => onEditWorkLocation(person)}
+                                    title={
+                                      offsiteLocation
+                                        ? `ปฏิบัติงานที่: ${offsiteLocation} (คลิกเพื่อแก้ไข)`
+                                        : 'ระบุกรณีปฏิบัติงานที่อื่น'
+                                    }
+                                    aria-label={`ระบุสถานที่ปฏิบัติงานจริงของ ${person.name}`}
+                                    className={`p-1.5 rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 ${
+                                      offsiteLocation
+                                        ? 'text-amber-600 bg-amber-50 hover:bg-amber-100'
+                                        : 'text-slate-400 hover:text-amber-600 hover:bg-amber-50'
+                                    }`}
+                                  >
+                                    <MapPin className="w-3.5 h-3.5" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => onEditStaff(person)}
+                                    title="แก้ไขข้อมูล"
+                                    aria-label={`แก้ไขข้อมูล ${person.name}`}
+                                    className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                                  >
+                                    <Pencil className="w-3.5 h-3.5" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => onDeleteStaff(person)}
+                                    title="ลบรายชื่อ"
+                                    aria-label={`ลบรายชื่อ ${person.name}`}
+                                    className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
                                 </div>
                               </div>
 
-                              <div className="flex flex-wrap items-center gap-1.5 shrink-0 pl-8 sm:pl-0">
-                                <div className="w-36">{renderLeadershipSelector(person)}</div>
-                                <div className="w-36">{renderMoveSelector(person)}</div>
-                                <button
-                                  type="button"
-                                  onClick={() => onEditWorkLocation(person)}
-                                  title={
-                                    offsiteLocation
-                                      ? `ปฏิบัติงานที่: ${offsiteLocation} (คลิกเพื่อแก้ไข)`
-                                      : 'ระบุกรณีปฏิบัติงานที่อื่น'
-                                  }
-                                  aria-label={`ระบุสถานที่ปฏิบัติงานจริงของ ${person.name}`}
-                                  className={`p-1.5 rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 ${
-                                    offsiteLocation
-                                      ? 'text-amber-600 bg-amber-50 hover:bg-amber-100'
-                                      : 'text-slate-400 hover:text-amber-600 hover:bg-amber-50'
-                                  }`}
-                                >
-                                  <MapPin className="w-3.5 h-3.5" />
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => onEditStaff(person)}
-                                  title="แก้ไขข้อมูล"
-                                  aria-label={`แก้ไขข้อมูล ${person.name}`}
-                                  className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
-                                >
-                                  <Pencil className="w-3.5 h-3.5" />
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => onDeleteStaff(person)}
-                                  title="ลบรายชื่อ"
-                                  aria-label={`ลบรายชื่อ ${person.name}`}
-                                  className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
-                                >
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                </button>
+                              <div className="pl-11 grid grid-cols-2 gap-1.5">
+                                {renderLeadershipSelector(person)}
+                                {renderMoveSelector(person)}
                               </div>
                             </div>
                           );
